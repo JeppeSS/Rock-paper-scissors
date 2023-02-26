@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:time" // TODO[Jeppe]: This is just for test
 import win32 "core:sys/windows"
 
 /*
@@ -22,6 +23,10 @@ WinConsole_t :: struct {
 } 
 
 
+ESC :: "\x1b"
+CSI :: "\x1b["
+
+
 main :: proc() {
 	console, err := create_win_console()
 	if(err != .WIN_CONSOLE_SUCCESS){
@@ -29,33 +34,46 @@ main :: proc() {
 		return
 	}
 	defer destroy_win_console(console)
-	
 
+
+	fmt.printf("%s?1049h", CSI) // Alternate buffer begin
+	fmt.printf("%s2J", CSI)     // Clear console
+
+	fmt.printf("Hello World!")
+
+
+	time.sleep(5000 * time.Millisecond)
+	
+	fmt.printf("%s?1049l", CSI) // Alternate buffer end
+	
 
 
 }
 
 
-// TODO[Jeppe]: Consider passing the output_handle to the enable_virtual_terminal_sequences procedure.
-//              as well as the input_handle to enable_input_events, by doing this we can eliminate two fetch calls.
 create_win_console :: proc() -> (^WinConsole_t, WinConsoleError_e) {
-	if err := enable_virtual_terminal_sequences(); err != .WIN_CONSOLE_SUCCESS {
-		return nil, err
-	}
-
 	output_handle, err1 := fetch_output_handle()
 	if err1 != .WIN_CONSOLE_SUCCESS {
 		return nil, err1
 	}
+							
 
-	if err := enable_input_events(); err != .WIN_CONSOLE_SUCCESS {
+	if err := enable_virtual_terminal_sequences(output_handle); err != .WIN_CONSOLE_SUCCESS {
 		return nil, err
 	}
+
 
 	input_handle, err2 := fetch_input_handle()
 	if err2 != .WIN_CONSOLE_SUCCESS {
 		return nil, err2
 	}
+	
+
+	if err := enable_input_events(input_handle); err != .WIN_CONSOLE_SUCCESS {
+		return nil, err
+	}
+
+
 	
 	result := new(WinConsole_t)
 	result.output_handle = output_handle
@@ -72,24 +90,18 @@ destroy_win_console :: proc(console: ^WinConsole_t) {
 }
 
 /*
-	Enables Virtual Terminal Sequences in the windows console by fetching and updating
-	the console mode of the output handle.
+	Enables Virtual Terminal Sequences in the windows console by updating the console
+	mode of the output handle.
 
 	Virtual Terminal Sequences are a set of control sequences that enables advanced text formatting and styling,
 	as well as other advanced features like mouse input, keyboard mapping and more.
 
 	Return outcomes:
 		WIN_CONSOLE_SUCCESS             - Operation completed successfully.
-		WIN_CONSOLE_OUTPUT_HANDLE_ERROR - An error occured while fetching the output handle.
 		WIN_CONSOLE_MODE_FETCH_ERROR    - An error occured while fetching the console mode.
 		WIN_CONSOLE_MODE_SET_ERROR      - An error occured while setting the 'ENABLE_VIRTUAL_TERMINAL_PROCESSING' flag.
 */
-enable_virtual_terminal_sequences :: proc() -> WinConsoleError_e {
-	output_handle, err := fetch_output_handle()
-	if(err != .WIN_CONSOLE_SUCCESS){
-		return err
-	}
-
+enable_virtual_terminal_sequences :: proc(output_handle: win32.HANDLE) -> WinConsoleError_e {
 	buffer_mode: u32 = 0
 	if( !win32.GetConsoleMode( output_handle, &buffer_mode ) ) {
 		return .WIN_CONSOLE_MODE_FETCH_ERROR
@@ -104,22 +116,17 @@ enable_virtual_terminal_sequences :: proc() -> WinConsoleError_e {
 }
 
 /*
-	Enables input events for the console window. It fetches the input handle of the
-	console window, sets the console mode.
+	Enables input events in the windows console by updating console mode
+	for the input handler.
 
 	By allowing input events, it gives the possibility to fetch and catch keyboard,
 	mouse and console size adjustment events and respond to them accordingly
 
 	Return outcomes:
 		WIN_CONSOLE_SUCCESS            - Operation completed successfully.
-		WIN_CONSOLE_INPUT_HANDLE_ERROR - An error occured while fetching the input handle.
+		WIN_CONSOLE_MODE_SET_ERROR     - An error occured while setting console flags.
 */
-enable_input_events :: proc() -> WinConsoleError_e {
-	input_handle, err := fetch_input_handle()
-	if err != .WIN_CONSOLE_SUCCESS {
-		return err
-	}
-
+enable_input_events :: proc(input_handle: win32.HANDLE) -> WinConsoleError_e {
 	buffer_mode: u32 = win32.ENABLE_WINDOW_INPUT | win32.ENABLE_MOUSE_INPUT
 	if !win32.SetConsoleMode( input_handle, buffer_mode ) {
 		return .WIN_CONSOLE_MODE_SET_ERROR
