@@ -10,6 +10,7 @@ import win32 "core:sys/windows"
 WinConsoleError_e :: enum {
 	WIN_CONSOLE_SUCCESS,             // This operation completed successfully.
 	WIN_CONSOLE_OUTPUT_HANDLE_ERROR, // An error occured while fetching the STD_OUTPUT_HANDLE.
+	WIN_CONSOLE_INPUT_HANDLE_ERROR,  // An error occured while fetching the STD_INPUT_HANDLE.
 	WIN_CONSOLE_MODE_FETCH_ERROR,    // An error occured while fetching the console mode.
 	WIN_CONSOLE_MODE_SET_ERROR,      // An error occured while setting or updating the console mode.
 }
@@ -17,6 +18,7 @@ WinConsoleError_e :: enum {
 
 WinConsole_t :: struct {
 	output_handle: win32.HANDLE,
+	input_handle:  win32.HANDLE,
 } 
 
 
@@ -26,39 +28,59 @@ main :: proc() {
 		fmt.println("[ERROR] Could not construct console: ", err)
 		return
 	}
-	defer free(console)
+	defer destroy_win_console(console)
 	
 
 
 
 }
 
+
+// TODO[Jeppe]: Consider passing the output_handle to the enable_virtual_terminal_sequences procedure.
+//              as well as the input_handle to enable_input_events, by doing this we can eliminate two fetch calls.
 create_win_console :: proc() -> (^WinConsole_t, WinConsoleError_e) {
 	if err := enable_virtual_terminal_sequences(); err != .WIN_CONSOLE_SUCCESS {
 		return nil, err
 	}
 
-	output_handle, err := fetch_output_handle()
-	if err != .WIN_CONSOLE_SUCCESS {
+	output_handle, err1 := fetch_output_handle()
+	if err1 != .WIN_CONSOLE_SUCCESS {
+		return nil, err1
+	}
+
+	if err := enable_input_events(); err != .WIN_CONSOLE_SUCCESS {
 		return nil, err
+	}
+
+	input_handle, err2 := fetch_input_handle()
+	if err2 != .WIN_CONSOLE_SUCCESS {
+		return nil, err2
 	}
 	
 	result := new(WinConsole_t)
 	result.output_handle = output_handle
+	result.input_handle  = input_handle
 	
 	return result, .WIN_CONSOLE_SUCCESS
 }
 
+
+destroy_win_console :: proc(console: ^WinConsole_t) {
+	win32.CloseHandle(console.output_handle)
+	win32.CloseHandle(console.input_handle)
+	free(console)
+}
+
 /*
 	Enables Virtual Terminal Sequences in the windows console by fetching and updating
-	the console mode of the 'STD_OUTPUT_HANDLE'.
+	the console mode of the output handle.
 
 	Virtual Terminal Sequences are a set of control sequences that enables advanced text formatting and styling,
 	as well as other advanced features like mouse input, keyboard mapping and more.
 
 	Return outcomes:
 		WIN_CONSOLE_SUCCESS             - Operation completed successfully.
-		WIN_CONSOLE_OUTPUT_HANDLE_ERROR - An error occured while fetching the 'STD_OUTPUT_HANDLE'.
+		WIN_CONSOLE_OUTPUT_HANDLE_ERROR - An error occured while fetching the output handle.
 		WIN_CONSOLE_MODE_FETCH_ERROR    - An error occured while fetching the console mode.
 		WIN_CONSOLE_MODE_SET_ERROR      - An error occured while setting the 'ENABLE_VIRTUAL_TERMINAL_PROCESSING' flag.
 */
@@ -82,6 +104,31 @@ enable_virtual_terminal_sequences :: proc() -> WinConsoleError_e {
 }
 
 /*
+	Enables input events for the console window. It fetches the input handle of the
+	console window, sets the console mode.
+
+	By allowing input events, it gives the possibility to fetch and catch keyboard,
+	mouse and console size adjustment events and respond to them accordingly
+
+	Return outcomes:
+		WIN_CONSOLE_SUCCESS            - Operation completed successfully.
+		WIN_CONSOLE_INPUT_HANDLE_ERROR - An error occured while fetching the input handle.
+*/
+enable_input_events :: proc() -> WinConsoleError_e {
+	input_handle, err := fetch_input_handle()
+	if err != .WIN_CONSOLE_SUCCESS {
+		return err
+	}
+
+	buffer_mode: u32 = win32.ENABLE_WINDOW_INPUT | win32.ENABLE_MOUSE_INPUT
+	if !win32.SetConsoleMode( input_handle, buffer_mode ) {
+		return .WIN_CONSOLE_MODE_SET_ERROR
+	}
+	
+	return .WIN_CONSOLE_SUCCESS
+}
+
+/*
 	Fetches the 'STD_OUTPUT_HANDLE' and returns it if succesfully. 
 
 	Return outcomes:
@@ -95,4 +142,20 @@ fetch_output_handle :: proc() -> (win32.HANDLE, WinConsoleError_e) {
 	}
 
 	return output_handle, .WIN_CONSOLE_SUCCESS
+}
+
+/*
+	Fetches the 'STD_INPUT_HANDLE' and returns it if succesfully. 
+
+	Return outcomes:
+		WIN_CONSOLE_SUCCESS             - Operation completed successfully.
+		WIN_CONSOLE_INPUT_HANDLE_ERROR  - An error occured while fetching the 'STD_INPUT_HANDLE'.
+*/
+fetch_input_handle :: proc() -> (win32.HANDLE, WinConsoleError_e) {
+	input_handle := win32.GetStdHandle( win32.STD_INPUT_HANDLE )
+	if( input_handle == win32.INVALID_HANDLE_VALUE ) {
+		return win32.INVALID_HANDLE_VALUE, .WIN_CONSOLE_INPUT_HANDLE_ERROR
+	}
+
+	return input_handle, .WIN_CONSOLE_SUCCESS
 }
