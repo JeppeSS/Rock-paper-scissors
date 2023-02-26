@@ -3,12 +3,15 @@ package main
 import "core:fmt"
 import win32 "core:sys/windows"
 
-
+/*
+	This enum represents the possible outcomes when using the Windows Console API. 
+	It includes success and various error scenarios related to interactions with the console.
+*/
 WinConsoleError_e :: enum {
-	WIN_CONSOLE_SUCCESS,
-	WIN_CONSOLE_COULD_NOT_GET_OUTPUT_HANDLE,
-	WIN_CONSOLE_COULD_NOT_GET_CONSOLE_MODE,
-	WIN_CONSOLE_COULD_NOT_SET_CONSOLE_MODE,
+	WIN_CONSOLE_SUCCESS,             // This operation completed successfully.
+	WIN_CONSOLE_OUTPUT_HANDLE_ERROR, // An error occured while fetching the STD_OUTPUT_HANDLE.
+	WIN_CONSOLE_MODE_FETCH_ERROR,    // An error occured while fetching the console mode.
+	WIN_CONSOLE_MODE_SET_ERROR,      // An error occured while setting or updating the console mode.
 }
 
 
@@ -20,20 +23,32 @@ main :: proc() {
 
 }
 
+/*
+	Enables Virtual Terminal Sequences in the windows console by fetching and updating
+	the console mode of the STD_OUTPUT_HANDLE.
+
+	Virtual Terminal Sequences are a set of control sequences that enables advanced text formatting and styling,
+	as well as other advanced features like mouse input, keyboard mapping and more.
+
+	Return outcomes:
+		WIN_CONSOLE_SUCCESS          - Operation completed successfully.
+		WIN_CONSOLE_MODE_FETCH_ERROR - An error occured while fetching the 'STD_OUTPUT_HANDLE'.
+		WIN_CONSOLE_MODE_SET_ERROR   - An error occured while setting the 'ENABLE_VIRTUAL_TERMINAL_PROCESSING' flag.
+*/
 enable_virtual_terminal_sequences :: proc() -> WinConsoleError_e {
 	output_handle := win32.GetStdHandle( win32.STD_OUTPUT_HANDLE )
 	if( output_handle == win32.INVALID_HANDLE_VALUE ) {
-		return .WIN_CONSOLE_COULD_NOT_GET_OUTPUT_HANDLE
+		return .WIN_CONSOLE_OUTPUT_HANDLE_ERROR
 	}
 
 	buffer_mode: u32 = 0
 	if( !win32.GetConsoleMode( output_handle, &buffer_mode ) ) {
-		return .WIN_CONSOLE_COULD_NOT_GET_CONSOLE_MODE
+		return .WIN_CONSOLE_MODE_FETCH_ERROR
 	}
 
 	buffer_mode = buffer_mode | win32.ENABLE_VIRTUAL_TERMINAL_PROCESSING
 	if( !win32.SetConsoleMode( output_handle, buffer_mode ) ){
-		return .WIN_CONSOLE_COULD_NOT_SET_CONSOLE_MODE
+		return .WIN_CONSOLE_MODE_SET_ERROR
 	}
 
 	return .WIN_CONSOLE_SUCCESS
