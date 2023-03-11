@@ -7,10 +7,6 @@ import inp "../input"
 import win "../windows"
 
 
-
-ESC :: "\x1b"
-CSI :: "\x1b["
-
 /*
 	This enum represents the possible outcomes when using the Windows Console API. 
 	It includes success and various error scenarios related to interactions with the terminal.
@@ -62,9 +58,8 @@ win_terminal_create :: proc() -> (p_terminal: ^WinTerminal_t, err: WinTerminalEr
 
 prepare_terminal :: proc() {
 	fmt.printf("%s?1049h", CSI) // Alternate buffer begin
-	fmt.printf("%s2J", CSI)     // Clear terminal
-	fmt.printf("\033[?25l")     // Hide cursor
-	fmt.printf("\033[0;0H")
+	terminal_clear()
+	terminal_move_cursor(0, 0)
 }
 
 win_terminal_stop :: proc(p_terminal: ^WinTerminal_t) {
@@ -122,10 +117,13 @@ listen_input_events :: proc(input_handle: win32.HANDLE, p_input_manager: ^inp.In
 
 from_virtual_key_code_to_key :: proc(key_code: win32.WORD) -> inp.Key_e {
 	win_key_map := map[win32.WORD]inp.Key_e {
-	0x1B = .KEY_ESC,
-	0x41 = .KEY_A,
-	0x42 = .KEY_B,
-}
+		0x1B = .KEY_ESC,
+		0x41 = .KEY_A,
+		0x42 = .KEY_B,
+		0x44 = .KEY_D,
+		0x53 = .KEY_S,
+		0x57 = .KEY_W,
+	}
 	key := win_key_map[key_code] or_else .KEY_UNKNOWN
 	return key
 }

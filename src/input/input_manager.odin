@@ -5,6 +5,9 @@ Key_e :: enum {
 	KEY_ESC,
 	KEY_A,
 	KEY_B,
+	KEY_D,
+	KEY_S,
+	KEY_W,
 	KEY_UNKNOWN, // TODO[Jeppe]: Delete this when the rest of the keys are here.
 }
 
