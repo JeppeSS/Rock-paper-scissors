@@ -9,17 +9,17 @@ import inp "input"
 
 
 main :: proc() {
-	p_console, err := term.win_console_create()
+	p_terminal, err := term.win_terminal_create()
 	if(err != nil){
-		fmt.println("[ERROR] Could not construct console: ", err)
+		fmt.println("[ERROR] Could not construct terminal: ", err)
 		return
 	}
-	defer term.win_console_destroy(p_console)
+	defer term.win_terminal_destroy(p_terminal)
 
 
-	for term.win_console_running(p_console) {
- 		if inp.is_key_down(p_console.p_input_manager, .KEY_ESC) {
- 			term.win_console_stop(p_console)
+	for term.win_terminal_running(p_terminal) {
+ 		if inp.is_key_down(p_terminal.p_input_manager, .KEY_ESC) {
+ 			term.win_terminal_stop(p_terminal)
  		}
 
 

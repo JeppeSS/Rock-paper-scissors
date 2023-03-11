@@ -6,14 +6,16 @@ import win32 "core:sys/windows"
 import inp "../input"
 import win "../windows"
 
+
+
 ESC :: "\x1b"
 CSI :: "\x1b["
 
 /*
 	This enum represents the possible outcomes when using the Windows Console API. 
-	It includes success and various error scenarios related to interactions with the console.
+	It includes success and various error scenarios related to interactions with the terminal.
 */
-WinConsoleError_e :: enum {
+WinTerminalError_e :: enum {
 	WIN_CONSOLE_OUTPUT_HANDLE_ERROR,       // An error occured while fetching the STD_OUTPUT_HANDLE.
 	WIN_CONSOLE_INPUT_HANDLE_ERROR,        // An error occured while fetching the STD_INPUT_HANDLE.
 	WIN_CONSOLE_MODE_FETCH_ERROR,          // An error occured while fetching the console mode.
@@ -23,7 +25,7 @@ WinConsoleError_e :: enum {
 }
 
 
-WinConsole_t :: struct {
+WinTerminal_t :: struct {
 	output_handle:   win32.HANDLE,
 	input_handle:    win32.HANDLE,
 	width:           i16,
@@ -33,7 +35,7 @@ WinConsole_t :: struct {
 } 
 
 
-win_console_create :: proc() -> (p_console: ^WinConsole_t, err: WinConsoleError_e) {
+win_terminal_create :: proc() -> (p_terminal: ^WinTerminal_t, err: WinTerminalError_e) {
 	// Fetch handles	
 	output_handle := fetch_output_handle() or_return
 	input_handle  := fetch_input_handle() or_return
@@ -42,10 +44,10 @@ win_console_create :: proc() -> (p_console: ^WinConsole_t, err: WinConsoleError_
 	enable_virtual_terminal_sequences(output_handle) or_return
 	enable_input_events(input_handle) or_return
 
-	// Fetch console dimensions
-	width, height := fetch_console_size(output_handle) or_return
+	// Fetch terminal dimensions
+	width, height := fetch_terminal_size(output_handle) or_return
 	
-	result                 := new(WinConsole_t)
+	result                 := new(WinTerminal_t)
 	result.output_handle   = output_handle
 	result.input_handle    = input_handle
 	result.width           = width
@@ -53,49 +55,49 @@ win_console_create :: proc() -> (p_console: ^WinConsole_t, err: WinConsoleError_
 	result.is_running      = true
 	result.p_input_manager = inp.create_input_manager()
 	
-	prepare_console();
+	prepare_terminal();
 	
 	return result, nil
 }
 
-prepare_console :: proc() {
+prepare_terminal :: proc() {
 	fmt.printf("%s?1049h", CSI) // Alternate buffer begin
-	fmt.printf("%s2J", CSI)     // Clear console
+	fmt.printf("%s2J", CSI)     // Clear terminal
 	fmt.printf("\033[?25l")     // Hide cursor
 	fmt.printf("\033[0;0H")
 }
 
-win_console_stop :: proc(p_console: ^WinConsole_t) {
-	p_console.is_running = false
+win_terminal_stop :: proc(p_terminal: ^WinTerminal_t) {
+	p_terminal.is_running = false
 }
 
 // TODO[Jeppe]: Reconsider name
-reset_console :: proc() {
+reset_terminal :: proc() {
 	fmt.printf("%s?1049l", CSI) // Alternate buffer end
 }
 
-win_console_running :: proc(p_console: ^WinConsole_t) -> bool {
-	if(p_console.is_running){
-		if(listen_input_events(p_console.input_handle, p_console.p_input_manager) != nil){
+win_terminal_running :: proc(p_terminal: ^WinTerminal_t) -> bool {
+	if(p_terminal.is_running){
+		if(listen_input_events(p_terminal.input_handle, p_terminal.p_input_manager) != nil){
 			return false;
 		}
 
 	}
-	return p_console.is_running
+	return p_terminal.is_running
 }
 
 
-win_console_destroy :: proc(p_console: ^WinConsole_t) {
-	reset_console()
+win_terminal_destroy :: proc(p_terminal: ^WinTerminal_t) {
+	reset_terminal()
 
-	inp.destroy_input_manager(p_console.p_input_manager)
-	win32.CloseHandle(p_console.output_handle)
-	win32.CloseHandle(p_console.input_handle)
-	free(p_console)
+	inp.destroy_input_manager(p_terminal.p_input_manager)
+	win32.CloseHandle(p_terminal.output_handle)
+	win32.CloseHandle(p_terminal.input_handle)
+	free(p_terminal)
 }
 
 
-listen_input_events :: proc(input_handle: win32.HANDLE, p_input_manager: ^inp.InputManager_t) -> WinConsoleError_e {
+listen_input_events :: proc(input_handle: win32.HANDLE, p_input_manager: ^inp.InputManager_t) -> WinTerminalError_e {
 	events_read: u32 = 0
 	input_records: [32]win.INPUT_RECORD
 	if(!win.ReadConsoleInputW(input_handle, &input_records[0], 32, &events_read)){
@@ -131,42 +133,42 @@ from_virtual_key_code_to_key :: proc(key_code: win32.WORD) -> inp.Key_e {
 
 
 /*
-	Retrieves the size of a Windows console given its output handle.
+	Retrieves the size of a Windows terminal given its output handle.
 
 	Parameters:
-		- output_handle: A handle to the console output for which the size is to be retrieved.
+		- output_handle: A handle to the terminal output for which the size is to be retrieved.
 
 	Returns:
-		- width: An i16 value representing the width of the console, in characters.
-		- height: An i16 value representing the height of the console, in characters.
-		- error: A WinConsoleError_e value indicating the outcome of the procedure.
+		- width: An i16 value representing the width of the terminal, in characters.
+		- height: An i16 value representing the height of the terminal, in characters.
+		- error: A WinTerminalError_e value indicating the outcome of the procedure.
 			- 'WIN_CONSOLE_SCREEN_BUFFER_FETCH_ERROR', indicating an error while retrieving the console screen buffer information.
 			- 'nil' if the procedure completed successfully.
 */
-fetch_console_size :: proc(output_handle: win32.HANDLE) -> (i16, i16, WinConsoleError_e) {
-	console_buffer_info: win32.CONSOLE_SCREEN_BUFFER_INFO
-	if( !win32.GetConsoleScreenBufferInfo(output_handle, &console_buffer_info) ) {
+fetch_terminal_size :: proc(output_handle: win32.HANDLE) -> (i16, i16, WinTerminalError_e) {
+	terminal_buffer_info: win32.CONSOLE_SCREEN_BUFFER_INFO
+	if( !win32.GetConsoleScreenBufferInfo(output_handle, &terminal_buffer_info) ) {
 		return 0, 0, .WIN_CONSOLE_SCREEN_BUFFER_FETCH_ERROR
 	}
 
-	width  := console_buffer_info.dwSize.X
-	height := console_buffer_info.dwSize.Y 
+	width  := terminal_buffer_info.dwSize.X
+	height := terminal_buffer_info.dwSize.Y 
 
 	return width, height, nil
 }
 
 /*
-	Enables Virtual Terminal Sequences in the windows console by updating the console
+	Enables Virtual Terminal Sequences in the windows terminal by updating the terminal
 	mode of the output handle.
 
 	Virtual Terminal Sequences are a set of control sequences that enables advanced text formatting and styling,
 	as well as other advanced features like mouse input, keyboard mapping and more.
 
 	Error outcomes:
-		WIN_CONSOLE_MODE_FETCH_ERROR    - An error occured while fetching the console mode.
+		WIN_CONSOLE_MODE_FETCH_ERROR    - An error occured while fetching the terminal mode.
 		WIN_CONSOLE_MODE_SET_ERROR      - An error occured while setting the 'ENABLE_VIRTUAL_TERMINAL_PROCESSING' flag.
 */
-enable_virtual_terminal_sequences :: proc(output_handle: win32.HANDLE) -> WinConsoleError_e {
+enable_virtual_terminal_sequences :: proc(output_handle: win32.HANDLE) -> WinTerminalError_e {
 	buffer_mode: u32 = 0
 	if( !win32.GetConsoleMode( output_handle, &buffer_mode ) ) {
 		return .WIN_CONSOLE_MODE_FETCH_ERROR
@@ -181,16 +183,16 @@ enable_virtual_terminal_sequences :: proc(output_handle: win32.HANDLE) -> WinCon
 }
 
 /*
-	Enables input events in the windows console by updating console mode
+	Enables input events in the windows terminal by updating terminal mode
 	for the input handler.
 
 	By allowing input events, it gives the possibility to fetch and catch keyboard,
-	mouse and console size adjustment events and respond to them accordingly
+	mouse and terminal size adjustment events and respond to them accordingly
 
 	Error outcomes:
-		WIN_CONSOLE_MODE_SET_ERROR     - An error occured while setting console flags.
+		WIN_CONSOLE_MODE_SET_ERROR     - An error occured while setting terminal flags.
 */
-enable_input_events :: proc(input_handle: win32.HANDLE) -> WinConsoleError_e {
+enable_input_events :: proc(input_handle: win32.HANDLE) -> WinTerminalError_e {
 	buffer_mode: u32 = win32.ENABLE_WINDOW_INPUT | win32.ENABLE_MOUSE_INPUT
 	if !win32.SetConsoleMode( input_handle, buffer_mode ) {
 		return .WIN_CONSOLE_MODE_SET_ERROR
@@ -204,7 +206,7 @@ enable_input_events :: proc(input_handle: win32.HANDLE) -> WinConsoleError_e {
 	Error outcomes:
 		WIN_CONSOLE_OUTPUT_HANDLE_ERROR - An error occured while fetching the 'STD_OUTPUT_HANDLE'.
 */
-fetch_output_handle :: proc() -> (win32.HANDLE, WinConsoleError_e) {
+fetch_output_handle :: proc() -> (win32.HANDLE, WinTerminalError_e) {
 	output_handle := win32.GetStdHandle( win32.STD_OUTPUT_HANDLE )
 	if( output_handle == win32.INVALID_HANDLE_VALUE ) {
 		return win32.INVALID_HANDLE_VALUE, .WIN_CONSOLE_OUTPUT_HANDLE_ERROR
@@ -219,7 +221,7 @@ fetch_output_handle :: proc() -> (win32.HANDLE, WinConsoleError_e) {
 	Error outcomes:
 		WIN_CONSOLE_INPUT_HANDLE_ERROR  - An error occured while fetching the 'STD_INPUT_HANDLE'.
 */
-fetch_input_handle :: proc() -> (win32.HANDLE, WinConsoleError_e) {
+fetch_input_handle :: proc() -> (win32.HANDLE, WinTerminalError_e) {
 	input_handle := win32.GetStdHandle( win32.STD_INPUT_HANDLE )
 	if( input_handle == win32.INVALID_HANDLE_VALUE ) {
 		return win32.INVALID_HANDLE_VALUE, .WIN_CONSOLE_INPUT_HANDLE_ERROR
