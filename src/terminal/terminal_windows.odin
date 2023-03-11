@@ -58,8 +58,8 @@ win_terminal_create :: proc() -> (p_terminal: ^WinTerminal_t, err: WinTerminalEr
 
 prepare_terminal :: proc() {
 	fmt.printf("%s?1049h", CSI) // Alternate buffer begin
-	terminal_clear()
-	terminal_move_cursor(0, 0)
+	clear()
+	move_cursor(0, 1)
 }
 
 win_terminal_stop :: proc(p_terminal: ^WinTerminal_t) {

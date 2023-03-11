@@ -2,51 +2,43 @@ package main
 
 import "core:fmt"
 
-import term "terminal"
+import "terminal"
 import inp "input"
 
 main :: proc() {
-	p_terminal, err := term.win_terminal_create()
+	p_terminal, err := terminal.win_terminal_create()
 	if(err != nil){
 		fmt.println("[ERROR] Could not construct terminal: ", err)
 		return
 	}
-	defer term.win_terminal_destroy(p_terminal)
+	defer terminal.win_terminal_destroy(p_terminal)
 
-	x := 0
-	y := 0
-
-	term.terminal_hide_cursor()
-	for term.win_terminal_running(p_terminal) {
- 		if inp.is_key_down(p_terminal.p_input_manager, .KEY_ESC) {
- 			term.win_terminal_stop(p_terminal)
- 		}
-
-		if inp.is_key_down(p_terminal.p_input_manager, .KEY_W){
-			y = y - 1
-			term.terminal_move_cursor(x, y)
-		}
-
-		if inp.is_key_down(p_terminal.p_input_manager, .KEY_S){
-			y = y + 1
-			term.terminal_move_cursor(x, y)
-		}
-
-		if inp.is_key_down(p_terminal.p_input_manager, .KEY_A){
-			x = x - 1
-			term.terminal_move_cursor(x, y)
-		}
-
-		if inp.is_key_down(p_terminal.p_input_manager, .KEY_D){
-			x = x + 1
-			term.terminal_move_cursor(x, y)
-
-		}
-
-		if inp.is_key_down(p_terminal.p_input_manager, .KEY_B){
-			fmt.printf("X")
-			x = x + 1
-			term.terminal_move_cursor(x, y)
-		}
+	// Setup
+	terminal.hide_cursor()
+	
+	
+	for terminal.win_terminal_running(p_terminal) {
+		print_heading()	
+		print_options()
+		print_input_field()
 	}
+}
+
+
+print_heading :: proc() {
+	terminal.write_at(0, 1, "*********************************************")
+	terminal.write_at(0, 2, "***          ROCK, PAPER, SCISSORS        ***")
+	terminal.write_at(0, 3, "*********************************************")
+}
+
+print_options :: proc() {
+	terminal.write_at(0, 6,  "Please select your move:")
+	terminal.write_at(0, 8,  "1. Rock")
+	terminal.write_at(0, 10, "2. Paper")
+	terminal.write_at(0, 12, "3. Scissors")
+	terminal.write_at(0, 14, "4. Quit")
+}
+
+print_input_field :: proc() {
+	terminal.write_at(0, 18, ">")
 }

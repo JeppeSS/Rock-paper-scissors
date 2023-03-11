@@ -7,14 +7,22 @@ ESC :: "\x1b"
 CSI :: "\x1b["
 
 
-terminal_clear :: proc() {
+clear :: proc() {
     fmt.printf("%s2J", CSI)
 }
 
-terminal_hide_cursor :: proc() {
+hide_cursor :: proc() {
     fmt.printf("%s?25l", CSI)
 }
 
-terminal_move_cursor :: proc(x: int, y: int) {
-    fmt.printf("\033[%d;%dH",y, x)
+move_cursor :: proc(x: int, y: int) {
+    fmt.printf("%s%d;%dH", CSI, y, x)
+}
+
+write :: proc(text: string){
+    fmt.printf("%s", text)
+}
+
+write_at :: proc(x: int, y: int, text: string) {
+    fmt.printf("%s%d;%dH%s", CSI, y, x, text)
 }
