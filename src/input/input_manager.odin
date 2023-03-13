@@ -2,7 +2,13 @@ package input
 
 
 Key_e :: enum {
+	KEY_BACKSPACE,
+	KEY_ENTER,
 	KEY_ESC,
+	KEY_1,
+	KEY_2,
+	KEY_3,
+	KEY_4,
 	KEY_A,
 	KEY_B,
 	KEY_D,

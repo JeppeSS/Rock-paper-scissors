@@ -26,3 +26,7 @@ write :: proc(text: string){
 write_at :: proc(x: int, y: int, text: string) {
     fmt.printf("%s%d;%dH%s", CSI, y, x, text)
 }
+
+delete_at :: proc(x: int, y: int) {
+    fmt.printf("%s%d;%dX", CSI, y, x)
+}
