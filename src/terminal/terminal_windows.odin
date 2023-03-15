@@ -62,7 +62,7 @@ prepare_terminal :: proc() {
 	move_cursor(0, 1)
 }
 
-win_terminal_stop :: proc(p_terminal: ^WinTerminal_t) {
+stop :: proc(p_terminal: ^WinTerminal_t) {
 	p_terminal.is_running = false
 }
 
