@@ -2,7 +2,19 @@ package main
 
 import "core:fmt"
 import "core:math/rand"
+import "core:log"
+
 import "terminal"
+import "event"
+
+
+
+Game_Context_t :: struct {
+	p_event_dispatcher: ^event.Event_Dispatcher_t,
+	p_terminal: ^terminal.WinTerminal_t,
+	scene: string,
+	ai_hand: Hand_e,
+}
 
 
 InputField_t :: struct {
@@ -28,28 +40,9 @@ Hand_e :: enum {
 	Scissors = 3,
 }
 
-EventType_e :: enum {
-	QUIT_EVENT,
-	SHOW_HAND_EVENT,
-	WIN_ROUND_EVENT,
-	LOSE_ROUND_EVENT,
-	DRAW_ROUND_EVENT,
-	CHANGE_SCENE,
-}
-
-
-
-EventData_u :: union {
-	Hand_e,
-	string,
-}
-
-GameEvent :: struct {
-	event_type: EventType_e,
-	data: EventData_u,
-}
 
 main :: proc() {
+
 	p_terminal, err := terminal.win_terminal_create()
 	if(err != nil){
 		fmt.println("[ERROR] Could not construct terminal: ", err)
@@ -57,82 +50,88 @@ main :: proc() {
 	}
 	defer terminal.win_terminal_destroy(p_terminal)
 
-	options_input_field := InputField_t{value = 0, is_valid = false, submit = false}
+	p_event_dispatcher := event.create_event_dispatcher()
+	defer event.destroy_event_dispatcher(p_event_dispatcher)
 
 	hands := [?]Hand_e{.Rock, .Paper, .Scissors}
-	ai_hand := rand.choice(hands[:])
 
+	game_context := Game_Context_t{ 
+		p_event_dispatcher = p_event_dispatcher,
+		p_terminal         = p_terminal,
+		scene              = "Main",
+		ai_hand            = rand.choice(hands[:]),
+	}
+
+	event.register_handler(p_event_dispatcher, "QUIT_EVENT", quit_event_handler)
+	event.register_handler(p_event_dispatcher, "SHOW_HAND_EVENT", show_hand_event_handler)
+	event.register_handler(p_event_dispatcher, "CHANGE_SCENE_EVENT", change_scene_event_handler)
+
+	options_input_field := InputField_t{value = 0, is_valid = false, submit = false}
+
+
+
+	terminal.hide_cursor()
+	for terminal.win_terminal_running(p_terminal) {
+
+		if game_context.scene == "Main" {
+			print_heading()	
+			print_options()
+			print_input_field(&options_input_field)
+
+			listen_for_input(p_terminal, &options_input_field)
+			handle_user_input(&game_context, &options_input_field)
+		
+		}
+		else if game_context.scene == "Win" {
+			terminal.write_at(5, 5, "You win!")
+		}
+		else if game_context.scene == "Lose" {
+			terminal.write_at(5, 5, "You lose!")
+		}
+		else if game_context.scene == "Draw" {
+			terminal.write_at(5, 5, "Its a draw!")
+		}
+
+	}
+}
+
+quit_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr){
+	p_game_context := cast(^Game_Context_t)p_game_context
+	terminal.stop(p_game_context.p_terminal)
+}
+
+show_hand_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr){
 	outcomes := [3][3]RoundState_e{
 		{.Draw, .Lose, .Win},
 		{.Win, .Draw, .Lose},
 		{.Lose, .Win, .Draw},
 	}
 
-	event_queue: [dynamic]GameEvent
-	defer delete(event_queue)
+	p_game_context := cast(^Game_Context_t)p_game_context
+	// TODO[Jeppe]: Can this process be simplified?
+	p_hand := cast(^Hand_e)p_event_data
 
-	scene := "Main"
-
-	terminal.hide_cursor()
-	for terminal.win_terminal_running(p_terminal) {
-
-		if scene == "Main" {
-			print_heading()	
-			print_options()
-			print_input_field(&options_input_field)
-
-			listen_for_input(p_terminal, &options_input_field)
-			event, ok := handle_input_field(&options_input_field).?
-			if ok do append(&event_queue, event)
-		
-		}
-		else if scene == "Win" {
-			terminal.write_at(5, 5, "You win!")
-		}
-		else if scene == "Lose" {
-			terminal.write_at(5, 5, "You lose!")
-		}
-		else if scene == "Draw" {
-			terminal.write_at(5, 5, "Its a draw!")
-		}
-
-
-
-
-		// TODO[Jeppe]: Move this to procedure
-		for len(event_queue) > 0 {
-			event := pop(&event_queue)
-			if event.event_type == .QUIT_EVENT {
-				terminal.stop(p_terminal)
-			}
-			else if event.event_type == .SHOW_HAND_EVENT {
-				outcome := outcomes[u8(event.data.(Hand_e)) - 1][u8(ai_hand) - 1]
-				switch outcome {
-					case .Win:
-						append(&event_queue, GameEvent{ event_type = .WIN_ROUND_EVENT})
-					case .Lose:
-						append(&event_queue, GameEvent{ event_type = .LOSE_ROUND_EVENT})
-					case .Draw:
-						append(&event_queue, GameEvent{ event_type = .DRAW_ROUND_EVENT})
-				}
-			}
-			else if event.event_type == .WIN_ROUND_EVENT {
-				append(&event_queue, GameEvent{ event_type = .CHANGE_SCENE, data = "Win"})
-			}
-			else if event.event_type == .LOSE_ROUND_EVENT {
-				append(&event_queue, GameEvent{ event_type = .CHANGE_SCENE, data = "Lose"})
-			}
-			else if event.event_type == .DRAW_ROUND_EVENT {
-				append(&event_queue, GameEvent{ event_type = .CHANGE_SCENE, data = "Draw"})
-			}
-			else if event.event_type == .CHANGE_SCENE {
-				terminal.clear()
-				scene = event.data.(string)
-			}
-		}
-
+	outcome := outcomes[u8(p_hand^) - 1][u8(p_game_context.ai_hand) - 1]
+	new_scene := ""
+	switch outcome {
+		case .Win:
+			new_scene = "Win"
+		case .Lose:		
+			new_scene = "Lose"
+		case .Draw:
+			new_scene = "Draw"
 	}
+
+	event.dispatch_event(p_game_context.p_event_dispatcher, "CHANGE_SCENE_EVENT", &new_scene, p_game_context)
 }
+
+change_scene_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr) {
+	p_game_context := cast(^Game_Context_t)p_game_context
+	p_scene := cast(^string)p_event_data
+	terminal.clear()
+	p_game_context.scene = p_scene^
+}
+
 
 
 print_heading :: proc() {
@@ -192,24 +191,18 @@ listen_for_input :: proc(p_terminal: ^terminal.WinTerminal_t, p_input_field: ^In
 	}
 }
 
-handle_input_field :: proc(p_input_field: ^InputField_t) -> Maybe(GameEvent) {
-	if p_input_field.submit {
-		game_event := handle_user_input(p_input_field)
+
+handle_user_input :: proc(p_game_context: ^Game_Context_t, p_input_field: ^InputField_t){
+	if p_input_field.submit  {
+
+		if p_input_field.value == QUIT {
+			event.dispatch_event(p_game_context.p_event_dispatcher, "QUIT_EVENT", nil, p_game_context)
+		} else if p_input_field.value == ROCK || p_input_field.value == PAPER || p_input_field.value == SCISSORS {
+			event.dispatch_event(p_game_context.p_event_dispatcher, "SHOW_HAND_EVENT", &p_input_field.value, p_game_context)
+		}
+
 		p_input_field.submit = false
 		p_input_field.is_valid = false
 		p_input_field.value = 0
-		return game_event
 	}
-
-	return nil
-}
-
-
-handle_user_input :: proc(p_input_field: ^InputField_t) -> GameEvent {
-	if p_input_field.value == QUIT {
-		return GameEvent{ event_type = .QUIT_EVENT }
-	}
-	
-
-	return GameEvent{ event_type = .SHOW_HAND_EVENT, data = cast(Hand_e)p_input_field.value }
 }
