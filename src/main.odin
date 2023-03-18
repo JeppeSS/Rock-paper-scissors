@@ -8,7 +8,6 @@ import "terminal"
 import "event"
 
 
-
 Game_Context_t :: struct {
 	p_event_dispatcher: ^event.Event_Dispatcher_t,
 	p_terminal: ^terminal.WinTerminal_t,
@@ -20,7 +19,6 @@ Game_Context_t :: struct {
 InputField_t :: struct {
 	value:    u8,
 	is_valid: bool,
-	submit:   bool,
 }
 
 ROCK ::1
@@ -65,8 +63,10 @@ main :: proc() {
 	event.register_handler(p_event_dispatcher, "QUIT_EVENT", quit_event_handler)
 	event.register_handler(p_event_dispatcher, "SHOW_HAND_EVENT", show_hand_event_handler)
 	event.register_handler(p_event_dispatcher, "CHANGE_SCENE_EVENT", change_scene_event_handler)
+	event.register_handler(p_event_dispatcher, "INPUT_SUBMIT_EVENT", input_submit_event_handler)
 
-	options_input_field := InputField_t{value = 0, is_valid = false, submit = false}
+
+	options_input_field := InputField_t{value = 0, is_valid = false,}
 
 
 
@@ -77,10 +77,7 @@ main :: proc() {
 			print_heading()	
 			print_options()
 			print_input_field(&options_input_field)
-
-			listen_for_input(p_terminal, &options_input_field)
-			handle_user_input(&game_context, &options_input_field)
-		
+			listen_for_input(&game_context, &options_input_field)
 		}
 		else if game_context.scene == "Win" {
 			terminal.write_at(5, 5, "You win!")
@@ -93,6 +90,21 @@ main :: proc() {
 		}
 
 	}
+}
+
+input_submit_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr){
+	p_game_context := cast(^Game_Context_t)p_game_context
+	p_input_field := cast(^InputField_t)p_event_data
+
+	if p_input_field.value == QUIT {
+		event.dispatch_event(p_game_context.p_event_dispatcher, "QUIT_EVENT", nil, p_game_context)
+	} else if p_input_field.value == ROCK || p_input_field.value == PAPER || p_input_field.value == SCISSORS {
+		event.dispatch_event(p_game_context.p_event_dispatcher, "SHOW_HAND_EVENT", &p_input_field.value, p_game_context)
+	}
+
+	p_input_field.is_valid = false
+	p_input_field.value = 0
+
 }
 
 quit_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr){
@@ -159,7 +171,8 @@ print_input_field :: proc(p_input_field: ^InputField_t) {
 }
 
 
-listen_for_input :: proc(p_terminal: ^terminal.WinTerminal_t, p_input_field: ^InputField_t) {
+listen_for_input :: proc(p_game_context: ^Game_Context_t, p_input_field: ^InputField_t) {
+	p_terminal := p_game_context.p_terminal
 	if terminal.is_key_down(p_terminal, .KEY_1) {
 		p_input_field.value = ROCK
 		p_input_field.is_valid = true
@@ -186,23 +199,7 @@ listen_for_input :: proc(p_terminal: ^terminal.WinTerminal_t, p_input_field: ^In
 
 	if terminal.is_key_down(p_terminal, .KEY_ENTER) {
 		if p_input_field.is_valid {
-			p_input_field.submit = true
+			event.dispatch_event(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT", p_input_field, p_game_context)
 		}
-	}
-}
-
-
-handle_user_input :: proc(p_game_context: ^Game_Context_t, p_input_field: ^InputField_t){
-	if p_input_field.submit  {
-
-		if p_input_field.value == QUIT {
-			event.dispatch_event(p_game_context.p_event_dispatcher, "QUIT_EVENT", nil, p_game_context)
-		} else if p_input_field.value == ROCK || p_input_field.value == PAPER || p_input_field.value == SCISSORS {
-			event.dispatch_event(p_game_context.p_event_dispatcher, "SHOW_HAND_EVENT", &p_input_field.value, p_game_context)
-		}
-
-		p_input_field.submit = false
-		p_input_field.is_valid = false
-		p_input_field.value = 0
 	}
 }
