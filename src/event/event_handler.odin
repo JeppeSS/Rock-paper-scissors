@@ -1,6 +1,6 @@
 package event
 
-// TODO[Jeppe]: Figure something out about the game_context, not sure this is the best
+// TODO[Jeppe]: Figure something out about the game_context, not sure this is the best way
 Event_Handler_t :: proc(p_game_context: rawptr = nil, p_event_data: rawptr = nil)
 
 // TODO[Jeppe]: Would it be possible to use some generic type as key to the handlers map?
