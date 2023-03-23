@@ -3,8 +3,8 @@ package terminal
 import "core:fmt"
 import win32 "core:sys/windows"
 
-import inp "../input"
-import win "../windows"
+import inp "hgl:input"
+import win "hgl:windows"
 
 
 /*
@@ -54,6 +54,14 @@ win_terminal_create :: proc() -> (p_terminal: ^WinTerminal_t, err: WinTerminalEr
 	prepare_terminal();
 	
 	return result, nil
+}
+
+win_terminal_register_key_callback :: proc(p_terminal: ^WinTerminal_t, callback: inp.Key_Callback_t, data: rawptr) {
+	inp.input_manager_register_key_callback(p_terminal.p_input_manager, callback, data)
+}
+
+win_terminal_unregister_key_callback :: proc(p_terminal: ^WinTerminal_t) {
+	inp.input_manager_unregister_key_callback(p_terminal.p_input_manager)
 }
 
 prepare_terminal :: proc() {
@@ -111,7 +119,7 @@ listen_input_events :: proc(input_handle: win32.HANDLE, p_input_manager: ^inp.In
 				is_down := cast(bool)key_event.bKeyDown
 				inp.toggle_key(p_input_manager, key, is_down)
 				if p_input_manager.key_callback != nil {
-					p_input_manager.key_callback(key, is_down)
+					p_input_manager.key_callback(key, is_down, p_input_manager.data)
 				}
 		}
 	}
@@ -128,6 +136,7 @@ from_virtual_key_code_to_key :: proc(key_code: win32.WORD) -> inp.Key_e {
 		0x32 = .KEY_2,
 		0x33 = .KEY_3,
 		0x34 = .KEY_4,
+		0x35 = .KEY_5,
 		0x41 = .KEY_A,
 		0x42 = .KEY_B,
 		0x44 = .KEY_D,

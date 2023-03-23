@@ -1,6 +1,8 @@
 package input
 
 
+Key_Callback_t :: proc(key: Key_e, is_down: bool, data: rawptr)
+
 Key_e :: enum {
 	KEY_BACKSPACE,
 	KEY_ENTER,
@@ -9,6 +11,7 @@ Key_e :: enum {
 	KEY_2,
 	KEY_3,
 	KEY_4,
+	KEY_5,
 	KEY_A,
 	KEY_B,
 	KEY_D,
@@ -19,7 +22,8 @@ Key_e :: enum {
 
 InputManager_t :: struct {
 	key_input: map[Key_e]bool,
-	key_callback: proc(key: Key_e, is_down: bool),
+	key_callback: Key_Callback_t,
+	data: rawptr,
 }
 
 
@@ -30,6 +34,17 @@ create_input_manager :: proc() -> ^InputManager_t {
 	result.key_input = make(map[Key_e]bool)
 	return result
 }
+
+input_manager_register_key_callback :: proc(p_input_manager: ^InputManager_t, callback: Key_Callback_t, data: rawptr) {
+	p_input_manager.key_callback = callback
+	p_input_manager.data = data
+}
+
+input_manager_unregister_key_callback :: proc(p_input_manager: ^InputManager_t) {
+	p_input_manager.key_callback = nil
+	p_input_manager.data = nil
+}
+
 
 destroy_input_manager :: proc(p_input_manager: ^InputManager_t) {
 	delete(p_input_manager.key_input)

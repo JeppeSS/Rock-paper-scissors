@@ -1,0 +1,196 @@
+package game_scene
+
+import "core:fmt"
+import "core:math/rand"
+
+
+import "hgl:terminal"
+import "hgl:event"
+
+import ctx "../context"
+
+import "../field"
+
+// TODO[Jeppe]: Clean this up
+
+Input_Submit_Event_t :: struct {
+    p_input_field: ^field.U8_InputField_t,
+    p_game_state: ^Classic_Game_State_t,
+}
+
+Show_Hands_Event_t :: struct {
+    move: u8,
+    p_game_state: ^Classic_Game_State_t,
+}
+
+Classic_Game_Scene_State_e :: enum {
+    Select_Move,
+    Show_Hands,
+}
+
+Round_State_e :: enum {
+    Win,
+    Lose,
+    Draw,
+}
+
+Classic_Game_State_t :: struct {
+    ai_hand:     u8,
+    player_hand: u8,
+    round_state: Round_State_e,
+    scene_state: Classic_Game_Scene_State_e, 
+}
+
+Classic_Game_Scene :: struct {
+    input_field: field.U8_InputField_t,
+    game_state: Classic_Game_State_t,
+}
+
+classic_game_scene_init :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
+    p_scene := cast(^Classic_Game_Scene)p_scene_data
+    p_scene.input_field = field.create_u8_input_field()
+}
+
+create_classic_game_state :: proc() -> Classic_Game_State_t {
+    ROCK :: 1
+    PAPER :: 2
+    SCISSORS :: 3
+    hands := [3]u8{ROCK, PAPER, SCISSORS}
+    return Classic_Game_State_t{ 
+        ai_hand     = rand.choice(hands[:]),
+        player_hand = 0,
+        round_state = nil,
+        scene_state = .Select_Move,
+    }
+}
+
+classic_game_scene_start :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
+    p_game_context := cast(^ctx.Game_Context_t)p_game_context
+    p_scene := cast(^Classic_Game_Scene)p_scene_data
+
+    terminal.win_terminal_register_key_callback(p_game_context.p_terminal, field.handle_key_event, &p_scene.input_field)
+	event.register_handler(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT", classic_game_input_submit_event_handler)
+    event.register_handler(p_game_context.p_event_dispatcher, "SHOW_HANDS_EVENT", classic_game_show_hands_event_handler)
+
+    p_scene.game_state = create_classic_game_state()
+
+}
+
+classic_game_scene_render :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
+    p_game_context := cast(^ctx.Game_Context_t)p_game_context
+    p_scene := cast(^Classic_Game_Scene)p_scene_data
+    game_state := p_scene.game_state
+    
+    if game_state.scene_state == .Select_Move {
+        terminal.write_at(0, 1,  " ____________________________________________________________________________")
+        terminal.write_at(0, 2,  "|                                                                            |")
+        terminal.write_at(0, 3,  "|                            ROCK, PAPER, SCISSORS                           |")
+        terminal.write_at(0, 4,  "|____________________________________________________________________________|")
+        terminal.write_at(0, 5,  "|                                                                            |")
+        terminal.write_at(0, 6,  "|                               CLASSIC GAME                                 |")
+        terminal.write_at(0, 7,  "|____________________________________________________________________________|")
+        terminal.write_at(0, 8,  "|                                  _______                                   |")
+        terminal.write_at(0, 9,  "|                              ---'   ____)                                  |")
+        terminal.write_at(0, 10, "|                                    (_____)                                 |")
+        terminal.write_at(0, 11, "|                                    (_____)                                 |")
+        terminal.write_at(0, 12, "|                                    (____)                                  |")
+        terminal.write_at(0, 13, "|                              ---.__(___)                                   |")
+        terminal.write_at(0, 14, "|  Choose your move:                                                         |")
+        terminal.write_at(0, 15, "|                                                                            |")
+        terminal.write_at(0, 16, "|       1. Rock               2. Paper              3. Scissors              |")
+        terminal.write_at(0, 17, "|            _______             _______                _______              |")
+        terminal.write_at(0, 18, "|        ---'   ____)        ---'    ____)____      ---'   ____)____         |")
+        terminal.write_at(0, 19, "|              (_____)                  ______)               ______)        |")
+        terminal.write_at(0, 20, "|              (_____)                 _______)            __________)       |")
+        terminal.write_at(0, 21, "|              (____)                 _______)            (____)             |")
+        terminal.write_at(0, 22, "|        ---.__(___)         ---.__________)        ---.__(___)              |")
+        terminal.write_at(0, 23, "|                                                                            |")
+        terminal.write_at(0, 24, "| 4. Quit                                                                    |")
+        terminal.write_at(0, 25, "|____________________________________________________________________________|")
+        terminal.write_at(0, 26, "|                                                                            |")
+        terminal.write_at(0, 27, "| Please enter the number of the move you would like to play:                |")
+        terminal.write_at(0, 28, "|                                                                            |")
+        terminal.write_at(0, 29, "| >                                                                          |")
+        terminal.write_at(0, 30, "|____________________________________________________________________________|")
+    
+            
+        input_field := p_scene.input_field
+        if input_field.value > 0 && input_field.value < 6 {
+            // TODO[Jeppe]: Fix this.
+            value := fmt.aprintf("%d", input_field.value)
+            terminal.write_at(5, 29, value)
+        } else {
+            terminal.delete_at(5, 29)
+        }
+    
+    }
+
+
+    if game_state.scene_state == .Show_Hands {
+        terminal.draw_box_at(0, 1, 76, 30, "_", "_", "|", "|")
+        terminal.write_at(0, 1, " ")
+        terminal.write_at(76, 0, " ")
+        terminal.draw_horizontal_line_at(2, 4, 73, "_")
+        terminal.write_at(32, 3,  "ROCK, PAPER, SCISSORS")
+    }
+
+
+
+
+
+
+    
+
+}
+
+classic_game_scene_update :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
+	p_game_context := cast(^ctx.Game_Context_t)p_game_context
+    p_scene := cast(^Classic_Game_Scene)p_scene_data
+
+    input_field := p_scene.input_field
+    if input_field.is_submitted {
+        event_data := Input_Submit_Event_t { p_input_field = &input_field, p_game_state = &p_scene.game_state}
+        event.dispatch_event(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT", &event_data, p_game_context)
+    }
+
+}
+
+
+classic_game_input_submit_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr) {
+	p_game_context := cast(^ctx.Game_Context_t)p_game_context
+	p_event_data := cast(^Input_Submit_Event_t)p_event_data
+    p_input_field := p_event_data.p_input_field
+
+    QUIT :: 4
+	if p_input_field.value == QUIT {
+		event.dispatch_event(p_game_context.p_event_dispatcher, "QUIT_EVENT", nil, p_game_context)
+	} else {
+        event_data := Show_Hands_Event_t { move = p_input_field.value, p_game_state = p_event_data.p_game_state}
+        event.dispatch_event(p_game_context.p_event_dispatcher, "SHOW_HANDS_EVENT", &event_data, p_game_context)
+    }
+
+    field.reset_u8_input_field(p_input_field)
+
+
+}
+
+classic_game_show_hands_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr) {
+    p_game_context := cast(^ctx.Game_Context_t)p_game_context
+    p_event_data := cast(^Show_Hands_Event_t)p_event_data
+    p_game_state := p_event_data.p_game_state
+
+	event.unregister_handler(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT")
+    terminal.win_terminal_unregister_key_callback(p_game_context.p_terminal)
+
+    p_game_state.scene_state = .Show_Hands
+    terminal.clear()
+
+    outcomes := [3][3]Round_State_e{
+		{.Draw, .Lose, .Win},
+		{.Win, .Draw, .Lose},
+		{.Lose, .Win, .Draw},
+	}
+
+
+
+}
