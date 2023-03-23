@@ -115,7 +115,7 @@ classic_game_scene_render :: proc(p_game_context: rawptr, p_scene_data: rawptr) 
     
             
         input_field := p_scene.input_field
-        if input_field.value > 0 && input_field.value < 6 {
+        if input_field.value > 0 && input_field.value < 5 {
             // TODO[Jeppe]: Fix this.
             value := fmt.aprintf("%d", input_field.value)
             terminal.write_at(5, 29, value)
@@ -127,19 +127,101 @@ classic_game_scene_render :: proc(p_game_context: rawptr, p_scene_data: rawptr) 
 
 
     if game_state.scene_state == .Show_Hands {
-        terminal.draw_box_at(0, 1, 76, 30, "_", "_", "|", "|")
-        terminal.write_at(0, 1, " ")
-        terminal.write_at(76, 0, " ")
-        terminal.draw_horizontal_line_at(2, 4, 73, "_")
-        terminal.write_at(32, 3,  "ROCK, PAPER, SCISSORS")
+        draw_scene_outline()
+
+        // Draw player hand
+        terminal.write_at(20, 12, "YOU")
+        if game_state.player_hand == 1 {
+            draw_rock_at(15, 13, true)
+        } else if game_state.player_hand == 2 {
+            draw_paper_at(15, 13, true)
+        } else {
+            draw_scissor_at(15, 13, true)
+        }
+
+        // Draw AI hand
+        terminal.write_at(54, 12, "COMPUTER")
+        if game_state.ai_hand == 1 {
+            draw_rock_at(50, 13, false)
+        } else if game_state.ai_hand == 2 {
+            draw_paper_at(45, 13, false)
+        } else {
+            draw_scissor_at(45, 13, false)
+        }
+
+
+        switch game_state.round_state {
+            case .Win: terminal.write_at(34, 22, "You win!")
+            case .Lose: terminal.write_at(34, 22, "You lose!")
+            case .Draw: terminal.write_at(34, 22, "It's a draw!")
+        }
+
     }
+}
 
+draw_rock_at :: proc(x: int, y: int, face_left: bool) {
+    if face_left {
+        terminal.write_at(x, y,   "    _______")
+        terminal.write_at(x, y+1, "---'   ____)")
+        terminal.write_at(x, y+2, "      (_____)")
+        terminal.write_at(x, y+3, "      (_____)")
+        terminal.write_at(x, y+4, "      (____) ")
+        terminal.write_at(x, y+5, "---.__(___)  ")
+    } else {
+        terminal.write_at(x, y,   "  _______    ")
+        terminal.write_at(x, y+1, " (____   '---")
+        terminal.write_at(x, y+2, "(_____)      ")
+        terminal.write_at(x, y+3, "(_____)      ")
+        terminal.write_at(x, y+4, " (____)      ")
+        terminal.write_at(x, y+5, "  (___)__.---") 
+    }
+}
 
+draw_paper_at :: proc(x: int, y: int, face_left: bool) {
+    if face_left {
+        terminal.write_at(x, y,   "    _______       ")
+        terminal.write_at(x, y+1, "---'    ____)____ ")
+        terminal.write_at(x, y+2, "           ______)")
+        terminal.write_at(x, y+3, "          _______)")
+        terminal.write_at(x, y+4, "         _______)")
+        terminal.write_at(x, y+5, "---.__________)")
+    } else {
+        terminal.write_at(x, y,   "       _______    ")
+        terminal.write_at(x, y+1, " ____(____    '---")
+        terminal.write_at(x, y+2, "(______           ")
+        terminal.write_at(x, y+3, "(_______          ")
+        terminal.write_at(x, y+4, " (_______         ")
+        terminal.write_at(x, y+5, "   (__________.---")
+    }
+}
 
+draw_scissor_at :: proc(x: int, y: int, face_left: bool) {
+    if face_left {
+        terminal.write_at(x, y,   "    _______       ")
+        terminal.write_at(x, y+1, "---'   ____)____  ")
+        terminal.write_at(x, y+2, "          ______) ")
+        terminal.write_at(x, y+3, "       __________)")
+        terminal.write_at(x, y+4, "      (____)      ")
+        terminal.write_at(x, y+5, "---.__(___)       ")
+    } else {
+        terminal.write_at(x, y,   "       _______    ")
+        terminal.write_at(x, y+1, "  ____(____   '---")
+        terminal.write_at(x, y+2, " (______          ")
+        terminal.write_at(x, y+3, "(__________       ")
+        terminal.write_at(x, y+4, "      (____)      ")
+        terminal.write_at(x, y+5, "       (___)__.---")
+    }
+}
 
-
-
-    
+draw_scene_outline :: proc() {
+    terminal.draw_box_at(0, 1, 76, 30, "_", "_", "|", "|")
+    terminal.write_at(0, 1, " ")
+    terminal.write_at(76, 0, " ")
+    terminal.write_at(30, 3,  "ROCK, PAPER, SCISSORS")
+    terminal.draw_horizontal_line_at(2, 4, 73, "_")
+    terminal.write_at(33, 6,  "CLASSIC GAME")
+    terminal.draw_horizontal_line_at(2, 7, 73, "_")
+    terminal.draw_horizontal_line_at(2, 25, 73, "_")
 
 }
 
@@ -180,17 +262,19 @@ classic_game_show_hands_event_handler :: proc(p_game_context: rawptr, p_event_da
     p_game_state := p_event_data.p_game_state
 
 	event.unregister_handler(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT")
+    event.unregister_handler(p_game_context.p_event_dispatcher, "SHOW_HANDS_EVENT")
+
     terminal.win_terminal_unregister_key_callback(p_game_context.p_terminal)
 
-    p_game_state.scene_state = .Show_Hands
-    terminal.clear()
-
     outcomes := [3][3]Round_State_e{
-		{.Draw, .Lose, .Win},
+	    {.Draw, .Lose, .Win},
 		{.Win, .Draw, .Lose},
 		{.Lose, .Win, .Draw},
 	}
 
+    p_game_state.scene_state = .Show_Hands
+    p_game_state.player_hand = p_event_data.move
+    p_game_state.round_state = outcomes[p_game_state.player_hand - 1][p_game_state.ai_hand - 1]
 
-
+    terminal.clear()
 }
