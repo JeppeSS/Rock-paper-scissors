@@ -43,6 +43,7 @@ main :: proc() {
 		start = msc.classic_game_scene_start,
 		render = msc.classic_game_scene_render,
 		update = msc.classic_game_scene_update,
+		stop   = msc.classic_game_scene_stop,
 		data  = &classic_game_scene,
 	}
 

@@ -15,12 +15,16 @@ import "../field"
 
 Input_Submit_Event_t :: struct {
     p_input_field: ^field.U8_InputField_t,
-    p_game_state: ^Classic_Game_State_t,
+    p_scene: ^Classic_Game_Scene,
+}
+
+Input_Enter_Event_t :: struct {
+    p_input_field: ^field.Enter_InputField_t,
 }
 
 Show_Hands_Event_t :: struct {
     move: u8,
-    p_game_state: ^Classic_Game_State_t,
+    p_scene: ^Classic_Game_Scene,
 }
 
 Classic_Game_Scene_State_e :: enum {
@@ -43,12 +47,14 @@ Classic_Game_State_t :: struct {
 
 Classic_Game_Scene :: struct {
     input_field: field.U8_InputField_t,
+    enter_field: field.Enter_InputField_t,
     game_state: Classic_Game_State_t,
 }
 
 classic_game_scene_init :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
     p_scene := cast(^Classic_Game_Scene)p_scene_data
     p_scene.input_field = field.create_u8_input_field()
+    p_scene.enter_field = field.create_enter_input_field()
 }
 
 create_classic_game_state :: proc() -> Classic_Game_State_t {
@@ -62,6 +68,23 @@ create_classic_game_state :: proc() -> Classic_Game_State_t {
         round_state = nil,
         scene_state = .Select_Move,
     }
+}
+
+
+classic_game_scene_stop :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
+    p_game_context := cast(^ctx.Game_Context_t)p_game_context
+    p_scene := cast(^Classic_Game_Scene)p_scene_data
+
+    field.reset_u8_input_field(&p_scene.input_field)
+    field.reset_enter_input_field(&p_scene.enter_field)
+
+    terminal.win_terminal_unregister_key_callback(p_game_context.p_terminal)
+	event.unregister_handler(p_game_context.p_event_dispatcher, "INPUT_ENTER_EVENT")
+    event.unregister_handler(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT")
+    event.unregister_handler(p_game_context.p_event_dispatcher, "SHOW_HANDS_EVENT")
+
+
+    terminal.write_at(15, 10, "IN STOP - CLASSIC")
 }
 
 classic_game_scene_start :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
@@ -156,6 +179,9 @@ classic_game_scene_render :: proc(p_game_context: rawptr, p_scene_data: rawptr) 
             case .Draw: terminal.write_at(34, 22, "It's a draw!")
         }
 
+
+        terminal.write_at(3, 27, "Press Enter to go back to Main Menu...")
+
     }
 }
 
@@ -228,12 +254,23 @@ draw_scene_outline :: proc() {
 classic_game_scene_update :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
 	p_game_context := cast(^ctx.Game_Context_t)p_game_context
     p_scene := cast(^Classic_Game_Scene)p_scene_data
+    game_state := p_scene.game_state
 
-    input_field := p_scene.input_field
-    if input_field.is_submitted {
-        event_data := Input_Submit_Event_t { p_input_field = &input_field, p_game_state = &p_scene.game_state}
-        event.dispatch_event(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT", &event_data, p_game_context)
+
+    if game_state.scene_state == .Select_Move {
+        input_field := p_scene.input_field
+        if input_field.is_submitted {
+            event_data := Input_Submit_Event_t { p_input_field = &input_field, p_scene = p_scene}
+            event.dispatch_event(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT", &event_data, p_game_context)
+        }
+    } else {
+        enter_field := p_scene.enter_field
+        if enter_field.is_submitted {
+            event_data := Input_Enter_Event_t { p_input_field = &enter_field}
+            event.dispatch_event(p_game_context.p_event_dispatcher, "INPUT_ENTER_EVENT", &event_data, p_game_context)
+        }
     }
+
 
 }
 
@@ -247,24 +284,39 @@ classic_game_input_submit_event_handler :: proc(p_game_context: rawptr, p_event_
 	if p_input_field.value == QUIT {
 		event.dispatch_event(p_game_context.p_event_dispatcher, "QUIT_EVENT", nil, p_game_context)
 	} else {
-        event_data := Show_Hands_Event_t { move = p_input_field.value, p_game_state = p_event_data.p_game_state}
+        event_data := Show_Hands_Event_t { move = p_input_field.value, p_scene = p_event_data.p_scene}
         event.dispatch_event(p_game_context.p_event_dispatcher, "SHOW_HANDS_EVENT", &event_data, p_game_context)
     }
 
     field.reset_u8_input_field(p_input_field)
+}
 
+classic_game_input_enter_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr) {
+	p_game_context := cast(^ctx.Game_Context_t)p_game_context
+	p_event_data := cast(^Input_Enter_Event_t)p_event_data
+    p_input_field := p_event_data.p_input_field
+    field.reset_enter_input_field(p_input_field)
+
+
+    scene := "Main Menu"
+	event.dispatch_event(p_game_context.p_event_dispatcher, "CHANGE_SCENE_EVENT", &scene, p_game_context)
 
 }
+
 
 classic_game_show_hands_event_handler :: proc(p_game_context: rawptr, p_event_data: rawptr) {
     p_game_context := cast(^ctx.Game_Context_t)p_game_context
     p_event_data := cast(^Show_Hands_Event_t)p_event_data
-    p_game_state := p_event_data.p_game_state
+    p_scene := p_event_data.p_scene
+    p_game_state := &p_scene.game_state
 
+    terminal.win_terminal_unregister_key_callback(p_game_context.p_terminal)
 	event.unregister_handler(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT")
     event.unregister_handler(p_game_context.p_event_dispatcher, "SHOW_HANDS_EVENT")
 
-    terminal.win_terminal_unregister_key_callback(p_game_context.p_terminal)
+    terminal.win_terminal_register_key_callback(p_game_context.p_terminal, field.handle_enter_field_key_event, &p_scene.enter_field)
+    event.register_handler(p_game_context.p_event_dispatcher, "INPUT_ENTER_EVENT", classic_game_input_enter_event_handler)
+
 
     outcomes := [3][3]Round_State_e{
 	    {.Draw, .Lose, .Win},

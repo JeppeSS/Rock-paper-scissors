@@ -23,12 +23,16 @@ main_menu_scene_start :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
     p_game_context := cast(^ctx.Game_Context_t)p_game_context
     p_scene := cast(^Main_Menu_Scene)p_scene_data
 
+
     terminal.win_terminal_register_key_callback(p_game_context.p_terminal, field.handle_key_event, &p_scene.input_field)
 	event.register_handler(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT", main_menu_input_submit_event_handler)
 }
 
 main_menu_scene_stop :: proc(p_game_context: rawptr, p_scene_data: rawptr) {
     p_game_context := cast(^ctx.Game_Context_t)p_game_context
+    p_scene := cast(^Main_Menu_Scene)p_scene_data
+
+    field.reset_u8_input_field(&p_scene.input_field)
 
     terminal.win_terminal_unregister_key_callback(p_game_context.p_terminal)
 	event.unregister_handler(p_game_context.p_event_dispatcher, "INPUT_SUBMIT_EVENT")
