@@ -1,1 +1,1 @@
-odin build .\src -collection:hgl=src\hgl 
+odin build .\src
