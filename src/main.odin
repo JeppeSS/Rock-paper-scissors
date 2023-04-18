@@ -139,36 +139,6 @@ get_random_hand :: proc() -> Hand_e {
     return Hand_e(random_hand_idx)
 }
 
-
-// TODO[Jeppe]: Need to fetch player hand.
-play_speed :: proc() {
-    SECONDS_TO_PLAY :: 30.0
-    score    := 0
-    running := true
-
-    stopwatch := time.Stopwatch{}
-    time.stopwatch_start(&stopwatch)
-    for running {
-        duration := time.stopwatch_duration(stopwatch)
-        seconds  := time.duration_seconds(duration)
-        fmt.printf("Time %f\n", seconds)
-        fmt.printf("Score %d\n", score)
-        if( seconds >= SECONDS_TO_PLAY) {
-            running = false
-            time.stopwatch_stop(&stopwatch)
-        } else {
-            ai_hand     := get_random_hand()
-            round_state := play_round(.Rock, ai_hand)
-            switch round_state {
-                case .Player_1_Win: score += 1
-                case .Player_2_Win: score -= 1
-                case .Draw:         
-            }
-        }
-    }
-
-}
-
 // TODO[Jeppe]: Need to fetch player hands.
 play_multiplayer :: proc() {
     ai_hand     := get_random_hand()
@@ -179,9 +149,6 @@ play_multiplayer :: proc() {
         case .Draw:         fmt.println("It's a draw!")
     }
 }
-
-
-
 
 
 
@@ -309,6 +276,8 @@ main :: proc() {
                             game_state.game_mode_state = Speed_Mode_State_t{ score = 0, stopwatch = time.Stopwatch{}, is_over = false }
                             p_speed_mode := &game_state.game_mode_state.(Speed_Mode_State_t)
                             time.stopwatch_start(&p_speed_mode.stopwatch)
+                        case  4:
+                            game_state.game_mode = .Multiplayer
                         case 5: is_app_running = false
                     }
                     p_input_field.value        = 0
@@ -466,9 +435,60 @@ main :: proc() {
                         game_state.game_mode = .None
                     }
                 }
+            case .Multiplayer:
+                if game_state.player_1_hand == .None {
+                        render_multiplayer_selection_player_1(&game_state)
+                        p_input_field := &game_state.input_field
+                        if p_input_field.is_submitted && p_input_field.value < 5 {
+                            fmt.printf("\x1b[2J") // Clear
+                            switch p_input_field.value {
+                                case 1: game_state.player_1_hand = .Rock
+                                case 2: game_state.player_1_hand = .Paper
+                                case 3: game_state.player_1_hand = .Scissor
+                                case 4: is_app_running = false
+                            }
+                            p_input_field.value = 0
+                            p_input_field.is_submitted = false
+                            game_state.is_drawn = false
+                        }
+                }
 
+                if game_state.player_2_hand == .None {
+                    render_multiplayer_selection_player_2(&game_state)
+                    p_input_field := &game_state.input_field
+                    if p_input_field.is_submitted && p_input_field.value < 5 {
+                        fmt.printf("\x1b[2J") // Clear
+                        switch p_input_field.value {
+                            case 1: game_state.player_2_hand = .Rock
+                            case 2: game_state.player_2_hand = .Paper
+                            case 3: game_state.player_2_hand = .Scissor
+                            case 4: is_app_running = false
+                        }
+                        p_input_field.value = 0
+                        p_input_field.is_submitted = false
+                        game_state.is_drawn = false
+
+                        game_state.game_mode_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                    }
+                }
+
+                if game_state.player_1_hand != .None && game_state.player_2_hand != .None {
+                    render_multiplayer_game(&game_state)
+                    p_input_field := &game_state.input_field
+                    if p_input_field.is_submitted {
+                        fmt.printf("\x1b[2J") // Clear
+                        game_state.game_mode = .None
+                        p_input_field.value = 0
+                        p_input_field.is_submitted = false
+                        game_state.is_drawn = false
+                        game_state.player_1_hand = .None
+                        game_state.player_2_hand = .None
+                    }
+                }
+                
         }
     }
+    
     // Alternate buffer end
     fmt.printf("\x1b[?1049l") 
 }
@@ -650,6 +670,45 @@ render_speed_game :: proc(p_game_state: ^Game_State_t) {
     write_at(21, 9, seconds_left)
 }
 
+render_multiplayer_game :: proc(p_game_state: ^Game_State_t) {
+    if !p_game_state.is_drawn {
+        draw_box_at(0, 1, 76, 30, "_", "_", "|", "|")
+        write_at(0, 1, " ")
+        write_at(76, 0, " ")
+        write_at(30, 3,  "ROCK, PAPER, SCISSORS")
+        draw_horizontal_line_at(2, 4, 73, "_")
+        write_at(33, 6,  "MULTIPLAYER")
+        draw_horizontal_line_at(2, 7, 73, "_")
+        draw_horizontal_line_at(2, 25, 73, "_")
+
+        // Draw player hand
+        write_at(20, 12, "PLAYER 1")
+        #partial switch p_game_state.player_1_hand {
+            case .Rock:    draw_rock_at(15, 13, true)
+            case .Paper:   draw_paper_at(15, 13, true)
+            case .Scissor: draw_scissor_at(15, 13, true)
+        }
+
+        // Draw AI hand
+        write_at(54, 12, "PLAYER 2")
+        #partial switch p_game_state.player_2_hand {
+            case .Rock:    draw_rock_at(50, 13, false)
+            case .Paper:   draw_paper_at(45, 13, false)
+            case .Scissor: draw_scissor_at(45, 13, false)
+        }
+
+        // Draw round outcome
+        switch p_game_state.game_mode_state.(Round_State_e) {
+            case .Player_1_Win: write_at(32, 22, "Player 1 win!")
+            case .Player_2_Win: write_at(32, 22, "Player 2 win!")
+            case .Draw:         write_at(32, 22, "It's a draw!")
+        }
+
+        write_at(3, 27, "Press Enter to go back to Main Menu...")
+        p_game_state.is_drawn = true
+    }
+}
+
 render_classic_game :: proc(p_game_state: ^Game_State_t) {
     if !p_game_state.is_drawn {
         draw_box_at(0, 1, 76, 30, "_", "_", "|", "|")
@@ -828,6 +887,96 @@ render_speed_end :: proc(p_game_state: ^Game_State_t) {
         p_game_state.is_drawn = true
     }
 }
+
+render_multiplayer_selection_player_1 :: proc(p_game_state: ^Game_State_t) {
+    if !p_game_state.is_drawn {
+        write_at(0, 1,  " ____________________________________________________________________________")
+        write_at(0, 2,  "|                                                                            |")
+        write_at(0, 3,  "|                            ROCK, PAPER, SCISSORS                           |")
+        write_at(0, 4,  "|____________________________________________________________________________|")
+        write_at(0, 5,  "|                                                                            |")
+        write_at(0, 6,  "|                                MULTIPLAYER                                 |")
+        write_at(0, 7,  "|____________________________________________________________________________|")
+        write_at(0, 8,  "|                                                                            |")
+        write_at(0, 9,  "|                                                                            |")
+        write_at(0, 10, "|  Choose your move:                                                         |")
+        write_at(0, 11, "|                                                                            |")
+        write_at(0, 12, "|       1. Rock               2. Paper              3. Scissors              |")
+        write_at(0, 13, "|            _______             _______                _______              |")
+        write_at(0, 14, "|        ---'   ____)        ---'    ____)____      ---'   ____)____         |")
+        write_at(0, 15, "|              (_____)                  ______)               ______)        |")
+        write_at(0, 16, "|              (_____)                 _______)            __________)       |")
+        write_at(0, 17, "|              (____)                 _______)            (____)             |")
+        write_at(0, 18, "|        ---.__(___)         ---.__________)        ---.__(___)              |")
+        write_at(0, 19, "|                                                                            |")
+        write_at(0, 20, "|                                                                            |")
+        write_at(0, 21, "|                                                                            |")
+        write_at(0, 22, "|                                                                            |")
+        write_at(0, 23, "|  4. Quit                                                                   |")
+        write_at(0, 24, "|                                                                            |")
+        write_at(0, 25, "|____________________________________________________________________________|")
+        write_at(0, 26, "|                                                                            |")
+        write_at(0, 27, "| Player 1, please enter the number of the move you would like to play.      |")
+        write_at(0, 28, "| The option will be hidden!                                                 |")
+        write_at(0, 29, "| >                                                                          |")
+        write_at(0, 30, "|____________________________________________________________________________|")
+        p_game_state.is_drawn = true
+    }
+
+    // TODO[Jeppe]: Fix issue with deleting input if 5 is pressed.
+    input_field := p_game_state.input_field
+    if input_field.value > 0 && input_field.value < 5 {
+		write_at(5, 29, "*")
+    } else {
+        write_at(5, 29, " ")
+    }
+}
+
+
+render_multiplayer_selection_player_2 :: proc(p_game_state: ^Game_State_t) {
+    if !p_game_state.is_drawn {
+        write_at(0, 1,  " ____________________________________________________________________________")
+        write_at(0, 2,  "|                                                                            |")
+        write_at(0, 3,  "|                            ROCK, PAPER, SCISSORS                           |")
+        write_at(0, 4,  "|____________________________________________________________________________|")
+        write_at(0, 5,  "|                                                                            |")
+        write_at(0, 6,  "|                                MULTIPLAYER                                 |")
+        write_at(0, 7,  "|____________________________________________________________________________|")
+        write_at(0, 8,  "|                                                                            |")
+        write_at(0, 9,  "|                                                                            |")
+        write_at(0, 10, "|  Choose your move:                                                         |")
+        write_at(0, 11, "|                                                                            |")
+        write_at(0, 12, "|       1. Rock               2. Paper              3. Scissors              |")
+        write_at(0, 13, "|            _______             _______                _______              |")
+        write_at(0, 14, "|        ---'   ____)        ---'    ____)____      ---'   ____)____         |")
+        write_at(0, 15, "|              (_____)                  ______)               ______)        |")
+        write_at(0, 16, "|              (_____)                 _______)            __________)       |")
+        write_at(0, 17, "|              (____)                 _______)            (____)             |")
+        write_at(0, 18, "|        ---.__(___)         ---.__________)        ---.__(___)              |")
+        write_at(0, 19, "|                                                                            |")
+        write_at(0, 20, "|                                                                            |")
+        write_at(0, 21, "|                                                                            |")
+        write_at(0, 22, "|                                                                            |")
+        write_at(0, 23, "|  4. Quit                                                                   |")
+        write_at(0, 24, "|                                                                            |")
+        write_at(0, 25, "|____________________________________________________________________________|")
+        write_at(0, 26, "|                                                                            |")
+        write_at(0, 27, "| Player 2, please enter the number of the move you would like to play.      |")
+        write_at(0, 28, "| The option will be hidden!                                                 |")
+        write_at(0, 29, "| >                                                                          |")
+        write_at(0, 30, "|____________________________________________________________________________|")
+        p_game_state.is_drawn = true
+    }
+
+    // TODO[Jeppe]: Fix issue with deleting input if 5 is pressed.
+    input_field := p_game_state.input_field
+    if input_field.value > 0 && input_field.value < 5 {
+		write_at(5, 29, "*")
+    } else {
+        write_at(5, 29, " ")
+    }
+}
+
 
 
 render_classic_selection :: proc(p_game_state: ^Game_State_t) {
