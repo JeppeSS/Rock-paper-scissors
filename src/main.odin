@@ -913,21 +913,3 @@ draw_scissor_at :: proc(x: int, y: int, face_left: bool) {
 write_at :: proc(x: int, y: int, text: string) {
     fmt.printf("\x1b[%d;%dH%s", y, x, text)
 }
-
-draw_box_at :: proc(x: int, y: int, width: u16, height: u16, top: string, bottom: string, left: string, right: string) {
-    for i in cast(u16)x..=(cast(u16)x + width) {
-        write_at(cast(int)i, y, top )
-        write_at(cast(int)i, y + cast(int)height, bottom )
-    }
-
-     for j in cast(u16)y..=(cast(u16)y + height) {
-        write_at(x, cast(int)j, left )
-        write_at(x + cast(int)width, cast(int)j, right )
-    }
-}
-
-draw_horizontal_line_at :: proc(x: int, y: int, width: u16, symbol: string) {
-    for i in cast(u16)x..=(cast(u16)x + width) {
-        write_at(cast(int)i, y, symbol )
-    }
-}
