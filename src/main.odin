@@ -37,26 +37,24 @@ Input_field_t :: struct {
 Best_Of_Mode_State_t :: struct {
     player_wins: u8,
     ai_wins: u8,
-    round_state: Round_State_e,
 }
 
 Speed_Mode_State_t :: struct {
     score: int,
     stopwatch: time.Stopwatch,
     is_over: bool,
-    round_state: Round_State_e,
 }
 
 Game_State_t :: struct {
     game_mode:  Game_Mode_e,
     game_mode_state: union {
-        Round_State_e,
         Best_Of_Mode_State_t,
         Speed_Mode_State_t,
     }
 
     player_1_hand: Hand_e,
     player_2_hand: Hand_e,
+    round_state:   Round_State_e,
     input_field:   Input_field_t,
     is_drawn:      bool,
 
@@ -231,7 +229,7 @@ main :: proc() {
                 } else {
                     if game_state.player_2_hand == .None {
                         game_state.player_2_hand = get_random_hand()
-                        game_state.game_mode_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                        game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
                     }
                     render_classic_game(&game_state)
                     p_input_field := &game_state.input_field
@@ -265,8 +263,8 @@ main :: proc() {
                     if game_state.player_2_hand == .None {
                         p_input_field := &game_state.input_field
                         game_state.player_2_hand = get_random_hand()
-                        p_best_of_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
-                        switch p_best_of_state.round_state {
+                        game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                        switch game_state.round_state {
                             case .Player_1_Win: p_best_of_state.player_wins += 1
                             case .Player_2_Win: p_best_of_state.ai_wins += 1
                             case .Draw:     
@@ -317,8 +315,8 @@ main :: proc() {
                         if game_state.player_2_hand == .None {
                             p_input_field := &game_state.input_field
                             game_state.player_2_hand = get_random_hand()
-                            p_speed_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
-                            switch p_speed_state.round_state {
+                            game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                            switch game_state.round_state {
                                 case .Player_1_Win: p_speed_state.score += 1
                                 case .Player_2_Win: p_speed_state.score -= 1
                                 case .Draw:     
@@ -389,7 +387,7 @@ main :: proc() {
                         p_input_field.is_submitted = false
                         game_state.is_drawn = false
 
-                        game_state.game_mode_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                        game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
                     }
                 }
 
@@ -502,7 +500,7 @@ render_classic_game :: proc(p_game_state: ^Game_State_t) {
         }
 
         // Draw round outcome
-        switch p_game_state.game_mode_state.(Round_State_e) {
+        switch p_game_state.round_state {
             case .Player_1_Win: write_at(34, 22, "You win!")
             case .Player_2_Win: write_at(34, 22, "You lose!")
             case .Draw:         write_at(34, 22, "It's a draw!")
@@ -581,7 +579,7 @@ render_best_of_game :: proc(p_game_state: ^Game_State_t) {
 
 
         // Draw round outcome
-        switch best_of_state.round_state {
+        switch p_game_state.round_state {
             case .Player_1_Win: write_at(34, 22, "You win!")
             case .Player_2_Win: write_at(34, 22, "You lose!")
             case .Draw:         write_at(34, 22, "It's a draw!")
@@ -675,7 +673,7 @@ render_speed_game :: proc(p_game_state: ^Game_State_t) {
 
 
         // Draw round outcome
-        switch speed_mode_state.round_state {
+        switch p_game_state.round_state {
             case .Player_1_Win: write_at(22, 28, "You win! Press ENTER to continue.")
             case .Player_2_Win: write_at(22, 28, "You lose! Press ENTER to continue.")
             case .Draw:         write_at(22, 28, "It's a draw! Press ENTER to continue.")
@@ -764,7 +762,7 @@ render_multiplayer_game :: proc(p_game_state: ^Game_State_t) {
         }
 
         // Draw round outcome
-        switch p_game_state.game_mode_state.(Round_State_e) {
+        switch p_game_state.round_state{
             case .Player_1_Win: write_at(32, 22, "Player 1 win!")
             case .Player_2_Win: write_at(32, 22, "Player 2 win!")
             case .Draw:         write_at(32, 22, "It's a draw!")
