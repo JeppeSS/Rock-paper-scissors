@@ -480,28 +480,7 @@ render_classic_game :: proc(p_game_state: ^Game_State_t) {
         // Title
         write_at(35, 6,  "CLASSIC")
 
-        // Draw player hand
-        write_at(20, 12, "YOU")
-        #partial switch p_game_state.player_1_hand {
-            case .Rock:    draw_rock_at(15, 13, true)
-            case .Paper:   draw_paper_at(15, 13, true)
-            case .Scissor: draw_scissor_at(15, 13, true)
-        }
-
-        // Draw AI hand
-        write_at(54, 12, "COMPUTER")
-        #partial switch p_game_state.player_2_hand {
-            case .Rock:    draw_rock_at(50, 13, false)
-            case .Paper:   draw_paper_at(45, 13, false)
-            case .Scissor: draw_scissor_at(45, 13, false)
-        }
-
-        // Draw round outcome
-        switch p_game_state.round_state {
-            case .Player_1_Win: write_at(34, 22, "You win!")
-            case .Player_2_Win: write_at(34, 22, "You lose!")
-            case .Draw:         write_at(34, 22, "It's a draw!")
-        }
+        draw_show_hands(p_game_state.player_1_hand, p_game_state.player_2_hand, p_game_state.round_state)
 
         write_at(3, 27, "Press Enter to go back to Main Menu...")
         p_game_state.is_drawn = true
@@ -556,33 +535,9 @@ render_best_of_game :: proc(p_game_state: ^Game_State_t) {
         write_at(45, 9, computer_score)
         write_at(2, 10, "____________________________________________________________________________")
 
-
-        // Draw player hand
-        write_at(20, 13, "YOU")
-        #partial switch p_game_state.player_1_hand {
-            case .Rock:    draw_rock_at(15, 14, true)
-            case .Paper:   draw_paper_at(15, 14, true)
-            case .Scissor: draw_scissor_at(15, 14, true)
-        }
+        draw_show_hands(p_game_state.player_1_hand, p_game_state.player_2_hand, p_game_state.round_state)
 
 
-        // Draw AI hand
-        write_at(54, 13, "COMPUTER")
-        #partial switch p_game_state.player_2_hand {
-            case .Rock:    draw_rock_at(50, 14, false)
-            case .Paper:   draw_paper_at(45, 14, false)
-            case .Scissor: draw_scissor_at(45, 14, false)
-        }
-
-
-        // Draw round outcome
-        switch p_game_state.round_state {
-            case .Player_1_Win: write_at(34, 22, "You win!")
-            case .Player_2_Win: write_at(34, 22, "You lose!")
-            case .Draw:         write_at(34, 22, "It's a draw!")
-        }
-
-        
         if( best_of_state.player_wins == 3 ){
             write_at(3, 27, "You win the game! Press Enter to go back to Main Menu")
         } else if(best_of_state.ai_wins == 3){
@@ -651,32 +606,8 @@ render_speed_game :: proc(p_game_state: ^Game_State_t) {
 
         write_at(2, 10, "____________________________________________________________________________")
 
-        // Draw player hand
-        write_at(20, 13, "YOU")
-        #partial switch p_game_state.player_1_hand {
-            case .Rock:    draw_rock_at(15, 14, true)
-            case .Paper:   draw_paper_at(15, 14, true)
-            case .Scissor: draw_scissor_at(15, 14, true)
-        }
-
-
-        // Draw AI hand
-        write_at(54, 13, "COMPUTER")
-        #partial switch p_game_state.player_2_hand {
-            case .Rock:    draw_rock_at(50, 14, false)
-            case .Paper:   draw_paper_at(45, 14, false)
-            case .Scissor: draw_scissor_at(45, 14, false)
-        }
-
-
-        // Draw round outcome
-        switch p_game_state.round_state {
-            case .Player_1_Win: write_at(22, 28, "You win! Press ENTER to continue.")
-            case .Player_2_Win: write_at(22, 28, "You lose! Press ENTER to continue.")
-            case .Draw:         write_at(22, 28, "It's a draw! Press ENTER to continue.")
-        }
-
-        write_at(4, 23, "4. Quit")
+        draw_show_hands(p_game_state.player_1_hand, p_game_state.player_2_hand, p_game_state.round_state)
+        write_at(3, 27, "Press ENTER to continue")
 
         p_game_state.is_drawn = true
     }
@@ -818,6 +749,29 @@ reset_game_outline :: proc() {
     for y := 26; y <= 29; y += 1 {
         write_at(2, y, "                                                                            ")
     } 
+}
+
+
+draw_show_hands :: proc(player_1_hand: Hand_e, player_2_hand: Hand_e, round_state: Round_State_e) {
+    write_at(20, 13, "YOU")
+    #partial switch player_1_hand {
+        case .Rock:    draw_rock_at(15, 14, true)
+        case .Paper:   draw_paper_at(15, 14, true)
+        case .Scissor: draw_scissor_at(15, 14, true)
+    }
+
+    write_at(54, 13, "COMPUTER")
+    #partial switch player_2_hand {
+        case .Rock:    draw_rock_at(50, 14, false)
+        case .Paper:   draw_paper_at(45, 14, false)
+        case .Scissor: draw_scissor_at(45, 14, false)
+    }
+
+    switch round_state {
+        case .Player_1_Win: write_at(34, 22, "You win!")
+        case .Player_2_Win: write_at(34, 22, "You lose!")
+        case .Draw:         write_at(34, 22, "It's a draw!")
+    }
 }
 
 draw_hand_selection :: proc() {
