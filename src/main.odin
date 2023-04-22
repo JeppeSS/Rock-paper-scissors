@@ -87,6 +87,18 @@ select_hand_option :: proc "contextless" (p_input_field: ^Input_field_t) -> (boo
     return is_submitted, hand;
 }
 
+handle_player_1_selection :: proc "contextless" (p_game_state: ^Game_State_t) {
+    is_submitted, hand_opt := select_hand_option(&p_game_state.input_field)
+    if is_submitted {
+        if hand_opt != .None {
+            p_game_state.player_1_hand = hand_opt
+        } else {
+            reset_game(p_game_state)
+        }
+        p_game_state.is_drawn = false
+    }
+}
+
 reset_round :: proc "contextless" (p_game_state: ^Game_State_t) {
     p_game_state.is_drawn      = false
     p_game_state.player_1_hand = .None
@@ -219,6 +231,7 @@ main :: proc() {
         input_field     = Input_field_t{ value = 0, is_submitted = false }
         player_1_hand   = .None,
         player_2_hand   = .None,
+        round_state     = nil,
         is_drawn        = false,
 
     }
@@ -262,15 +275,7 @@ main :: proc() {
             case .Classic:
                 if game_state.player_1_hand == .None {
                     render_classic_selection(&game_state)
-                    is_submitted, hand_opt := select_hand_option(&game_state.input_field)
-                    if is_submitted {
-                        if hand_opt != .None {
-                            game_state.player_1_hand = hand_opt
-                        } else {
-                            game_state.game_mode = .None
-                        }
-                        game_state.is_drawn = false
-                    }
+                    handle_player_1_selection(&game_state)
                 } else {
                     if game_state.player_2_hand == .None {
                         game_state.player_2_hand = get_random_hand()
@@ -285,15 +290,7 @@ main :: proc() {
             case .Best_Of:
                 if game_state.player_1_hand == .None {
                     render_best_of_selection(&game_state)
-                    is_submitted, hand_opt := select_hand_option(&game_state.input_field)
-                    if is_submitted {
-                        if hand_opt != .None {
-                            game_state.player_1_hand = hand_opt
-                        } else {
-                            game_state.game_mode = .None
-                        }
-                        game_state.is_drawn = false
-                    }
+                    handle_player_1_selection(&game_state)
                 } else {
                     p_best_of_state := &game_state.game_mode_state.(Best_Of_Mode_State_t)
                     if game_state.player_2_hand == .None {
@@ -328,15 +325,7 @@ main :: proc() {
                 if seconds <= 30.0 {
                     if game_state.player_1_hand == .None {
                         render_speed_selection(&game_state)
-                        is_submitted, hand_opt := select_hand_option(&game_state.input_field)
-                        if is_submitted {
-                            if hand_opt != .None {
-                                game_state.player_1_hand = hand_opt
-                            } else {
-                                game_state.game_mode = .None
-                            }
-                            game_state.is_drawn = false
-                        }
+                        handle_player_1_selection(&game_state)
                     } else {
                         if game_state.player_2_hand == .None {
                             game_state.player_2_hand = get_random_hand()
@@ -373,32 +362,20 @@ main :: proc() {
             case .Multiplayer:
                 if game_state.player_1_hand == .None {
                         render_multiplayer_selection_player(&game_state, true)
-                        is_submitted, hand_opt := select_hand_option(&game_state.input_field)
-                        if is_submitted {
-                            if hand_opt != .None {
-                                game_state.player_1_hand = hand_opt
-                            } else {
-                                game_state.game_mode = .None
-                            }
-                            game_state.is_drawn = false
-                        }
-                }
-
-                if game_state.player_2_hand == .None {
+                        handle_player_1_selection(&game_state)
+                } else if game_state.player_2_hand == .None {
                     render_multiplayer_selection_player(&game_state, false)
                     is_submitted, hand_opt := select_hand_option(&game_state.input_field)
                     if is_submitted {
                         if hand_opt != .None {
                             game_state.player_2_hand = hand_opt
+                            game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
                         } else {
-                            game_state.game_mode = .None
+                            reset_round(&game_state)
                         }
-                        game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
                         game_state.is_drawn = false
                     }
-                }
-
-                if game_state.player_1_hand != .None && game_state.player_2_hand != .None {
+                } else if game_state.player_1_hand != .None && game_state.player_2_hand != .None {
                     render_multiplayer_game(&game_state)
                     if game_state.input_field.is_submitted {
                         reset_game(&game_state)
@@ -458,33 +435,20 @@ render_classic_selection :: proc(p_game_state: ^Game_State_t) {
     if !p_game_state.is_drawn {
         reset_game_outline()
 
-        // Title
         write_at(35, 6, "CLASSIC")
-
-        // Body
         draw_hand_selection()
-
         p_game_state.is_drawn = true
     }
 
-    input_field := p_game_state.input_field
-    if input_field.value > 0 && input_field.value < 5 {
-        value := fmt.aprintf("%d", input_field.value)
-		write_at(5, 29, value)
-    } else if input_field.value == 0 {
-        write_at(5, 29, " ")
-    }
+    draw_input_field(p_game_state.input_field, false)
 }
 
 render_classic_game :: proc(p_game_state: ^Game_State_t) {
     if !p_game_state.is_drawn {
         reset_game_outline()
 
-        // Title
         write_at(35, 6,  "CLASSIC")
-
         draw_show_hands(p_game_state.player_1_hand, p_game_state.player_2_hand, p_game_state.round_state)
-
         write_at(3, 27, "Press Enter to go back to Main Menu...")
         p_game_state.is_drawn = true
     }
@@ -494,10 +458,7 @@ render_best_of_selection :: proc(p_game_state: ^Game_State_t) {
     if !p_game_state.is_drawn {
         reset_game_outline()
 
-        // Title
         write_at(32, 6, "BEST OUT OF FIVE")
-
-        // Score
         best_of_state := p_game_state.game_mode_state.(Best_Of_Mode_State_t)
         player_score := fmt.aprintf("Player Score: %d", best_of_state.player_wins)
         computer_score := fmt.aprintf("Computer Score: %d", best_of_state.ai_wins)
@@ -506,19 +467,12 @@ render_best_of_selection :: proc(p_game_state: ^Game_State_t) {
         write_at(45, 9, computer_score)
         write_at(2, 10, "____________________________________________________________________________")
 
-        // Body
         draw_hand_selection()
 
         p_game_state.is_drawn = true
     }
 
-    input_field := p_game_state.input_field
-    if input_field.value > 0 && input_field.value < 5 {
-        value := fmt.aprintf("%d", input_field.value)
-		write_at(5, 29, value)
-    } else if input_field.value == 0 {
-        write_at(5, 29, " ")
-    }
+    draw_input_field(p_game_state.input_field, false)
 }
 
 render_best_of_game :: proc(p_game_state: ^Game_State_t) {
@@ -577,13 +531,7 @@ render_speed_selection :: proc(p_game_state: ^Game_State_t) {
     write_at(21, 9, seconds_left)
     write_at(64, 9, score)
 
-    input_field := p_game_state.input_field
-    if input_field.value > 0 && input_field.value < 5 {
-        value := fmt.aprintf("%d", input_field.value)
-		write_at(5, 29, value)
-    } else if input_field.value == 0 {
-        write_at(5, 29, " ")
-    }
+    draw_input_field(p_game_state.input_field, false)
 }
 
 render_speed_game :: proc(p_game_state: ^Game_State_t) {
@@ -659,12 +607,7 @@ render_multiplayer_selection_player :: proc(p_game_state: ^Game_State_t, is_play
         p_game_state.is_drawn = true
     }
 
-    input_field := p_game_state.input_field
-    if input_field.value > 0 && input_field.value < 5 {
-		write_at(5, 29, "*")
-    } else if input_field.value == 0 {
-        write_at(5, 29, " ")
-    }
+    draw_input_field(p_game_state.input_field, true)
 }
 
 render_multiplayer_game :: proc(p_game_state: ^Game_State_t) {
@@ -774,6 +717,20 @@ draw_show_hands :: proc(player_1_hand: Hand_e, player_2_hand: Hand_e, round_stat
     }
 }
 
+draw_input_field :: proc(input_field: Input_field_t, is_secret: bool) {
+    if input_field.value > 0 && input_field.value < 5 {
+        if !is_secret {
+            value := fmt.aprintf("%d", input_field.value)
+		    write_at(5, 29, value)
+        } else {
+            write_at(5, 29, "*")
+        }
+
+    } else if input_field.value == 0 {
+        write_at(5, 29, " ")
+    }
+}
+
 draw_hand_selection :: proc() {
     write_at(4, 12, "Choose your move:")
 
@@ -785,7 +742,7 @@ draw_hand_selection :: proc() {
     write_at(2, 19, "              (____)                 _______)            (____)")
     write_at(2, 20, "        ---.__(___)         ---.__________)        ---.__(___)")
 
-    write_at(4, 23, "4. Main menu")
+    write_at(4, 23, "4. Back")
 
     write_at(3, 27, "Please enter the number of the move you would like to play:")
     write_at(3, 29, ">")
