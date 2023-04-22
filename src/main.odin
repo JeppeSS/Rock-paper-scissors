@@ -474,12 +474,11 @@ render_classic_selection :: proc(p_game_state: ^Game_State_t) {
         p_game_state.is_drawn = true
     }
 
-    // TODO[Jeppe]: Fix issue with deleting input if 5 is pressed.
     input_field := p_game_state.input_field
     if input_field.value > 0 && input_field.value < 5 {
         value := fmt.aprintf("%d", input_field.value)
 		write_at(5, 29, value)
-    } else {
+    } else if input_field.value == 0 {
         write_at(5, 29, " ")
     }
 }
@@ -520,12 +519,11 @@ render_best_of_selection :: proc(p_game_state: ^Game_State_t) {
         p_game_state.is_drawn = true
     }
 
-    // TODO[Jeppe]: Fix issue with deleting input if 5 is pressed.
     input_field := p_game_state.input_field
     if input_field.value > 0 && input_field.value < 5 {
         value := fmt.aprintf("%d", input_field.value)
 		write_at(5, 29, value)
-    } else {
+    } else if input_field.value == 0 {
         write_at(5, 29, " ")
     }
 }
@@ -586,12 +584,11 @@ render_speed_selection :: proc(p_game_state: ^Game_State_t) {
     write_at(21, 9, seconds_left)
     write_at(64, 9, score)
 
-    // TODO[Jeppe]: Fix issue with deleting input if 5 is pressed.
     input_field := p_game_state.input_field
     if input_field.value > 0 && input_field.value < 5 {
         value := fmt.aprintf("%d", input_field.value)
 		write_at(5, 29, value)
-    } else {
+    } else if input_field.value == 0 {
         write_at(5, 29, " ")
     }
 }
@@ -669,11 +666,10 @@ render_multiplayer_selection_player :: proc(p_game_state: ^Game_State_t, is_play
         p_game_state.is_drawn = true
     }
 
-    // TODO[Jeppe]: Fix issue with deleting input if 5 is pressed.
     input_field := p_game_state.input_field
     if input_field.value > 0 && input_field.value < 5 {
 		write_at(5, 29, "*")
-    } else {
+    } else if input_field.value == 0 {
         write_at(5, 29, " ")
     }
 }
