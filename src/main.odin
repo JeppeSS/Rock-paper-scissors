@@ -75,7 +75,7 @@ select_hand :: proc "contextless" (p_input_field: ^Input_field_t) -> Hand_e {
 select_hand_option :: proc "contextless" (p_input_field: ^Input_field_t) -> (bool, Hand_e) {
     is_submitted := false
     hand: Hand_e = .None
-    if p_input_field.is_submitted && p_input_field.value < 5 {
+    if p_input_field.is_submitted && p_input_field.value > 0 && p_input_field.value < 5 {
         switch p_input_field.value {
             case 1: hand = .Rock
             case 2: hand = .Paper
@@ -85,6 +85,23 @@ select_hand_option :: proc "contextless" (p_input_field: ^Input_field_t) -> (boo
         reset_input_field(p_input_field)
     }
     return is_submitted, hand;
+}
+
+reset_round :: proc "contextless" (p_game_state: ^Game_State_t) {
+    p_game_state.is_drawn      = false
+    p_game_state.player_1_hand = .None
+    p_game_state.player_2_hand = .None
+    p_game_state.round_state   = nil
+    reset_input_field(&p_game_state.input_field)
+}
+
+reset_game :: proc "contextless" (p_game_state: ^Game_State_t) {
+    p_game_state.is_drawn      = false
+    p_game_state.game_mode     = .None
+    p_game_state.player_1_hand = .None
+    p_game_state.player_2_hand = .None
+    p_game_state.round_state   = nil
+    reset_input_field(&p_game_state.input_field)
 }
 
 reset_input_field :: proc "contextless" (p_input_field: ^Input_field_t) {
@@ -242,7 +259,7 @@ main :: proc() {
                 }
 
 
-            case .Classic: // Classic game mode
+            case .Classic:
                 if game_state.player_1_hand == .None {
                     render_classic_selection(&game_state)
                     is_submitted, hand_opt := select_hand_option(&game_state.input_field)
@@ -260,13 +277,8 @@ main :: proc() {
                         game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
                     }
                     render_classic_game(&game_state)
-                    p_input_field := &game_state.input_field
-                    if p_input_field.is_submitted {
-                        game_state.game_mode = .None
-                        reset_input_field(p_input_field)
-                        game_state.is_drawn = false
-                        game_state.player_1_hand = .None
-                        game_state.player_2_hand = .None
+                    if game_state.input_field.is_submitted {
+                        reset_game(&game_state)
                     }
                 }
 
@@ -285,7 +297,6 @@ main :: proc() {
                 } else {
                     p_best_of_state := &game_state.game_mode_state.(Best_Of_Mode_State_t)
                     if game_state.player_2_hand == .None {
-                        p_input_field := &game_state.input_field
                         game_state.player_2_hand = get_random_hand()
                         game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
                         switch game_state.round_state {
@@ -293,18 +304,14 @@ main :: proc() {
                             case .Player_2_Win: p_best_of_state.ai_wins += 1
                             case .Draw:     
                         }
-                        reset_input_field(p_input_field)
+                        reset_input_field(&game_state.input_field)
                         game_state.is_drawn = false
                     } 
                     
                     if game_state.player_2_hand != .None {
                         render_best_of_game(&game_state)
-                        p_input_field := &game_state.input_field
-                        if p_input_field.is_submitted {
-                            reset_input_field(p_input_field)
-                            game_state.is_drawn = false
-                            game_state.player_1_hand = .None
-                            game_state.player_2_hand = .None
+                        if game_state.input_field.is_submitted {
+                            reset_round(&game_state)
                             if( p_best_of_state.player_wins >= 3 || p_best_of_state.ai_wins >= 3) {
                                 game_state.game_mode = .None
                             }
@@ -332,7 +339,6 @@ main :: proc() {
                         }
                     } else {
                         if game_state.player_2_hand == .None {
-                            p_input_field := &game_state.input_field
                             game_state.player_2_hand = get_random_hand()
                             game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
                             switch game_state.round_state {
@@ -340,18 +346,14 @@ main :: proc() {
                                 case .Player_2_Win: p_speed_state.score -= 1
                                 case .Draw:     
                             }
-                            reset_input_field(p_input_field)
+                            reset_input_field(&game_state.input_field)
                             game_state.is_drawn = false
                         } 
                     
                         if game_state.player_2_hand != .None {
                             render_speed_game(&game_state)
-                            p_input_field := &game_state.input_field
-                            if p_input_field.is_submitted {
-                                reset_input_field(p_input_field)
-                                game_state.is_drawn = false
-                                game_state.player_1_hand = .None
-                                game_state.player_2_hand = .None
+                            if game_state.input_field.is_submitted {
+                                reset_round(&game_state)
                             }
                         }
                     }
@@ -365,11 +367,7 @@ main :: proc() {
                     render_speed_end(&game_state)
                     p_input_field := &game_state.input_field
                     if p_input_field.is_submitted {
-                        reset_input_field(p_input_field)
-                        game_state.is_drawn = false
-                        game_state.player_1_hand = .None
-                        game_state.player_2_hand = .None
-                        game_state.game_mode = .None
+                        reset_game(&game_state)
                     }
                 }
             case .Multiplayer:
@@ -402,13 +400,8 @@ main :: proc() {
 
                 if game_state.player_1_hand != .None && game_state.player_2_hand != .None {
                     render_multiplayer_game(&game_state)
-                    p_input_field := &game_state.input_field
-                    if p_input_field.is_submitted {
-                        game_state.game_mode = .None
-                        reset_input_field(p_input_field)
-                        game_state.is_drawn = false
-                        game_state.player_1_hand = .None
-                        game_state.player_2_hand = .None
+                    if game_state.input_field.is_submitted {
+                        reset_game(&game_state)
                     }
                 }
                 
