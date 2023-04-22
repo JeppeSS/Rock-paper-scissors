@@ -61,7 +61,57 @@ Game_State_t :: struct {
 }
 
 
-play_round :: proc(player_1_hand: Hand_e, player_2_hand: Hand_e) -> Round_State_e {
+reset_input_field :: proc "contextless" (p_input_field: ^Input_field_t) {
+    p_input_field.value        = 0
+    p_input_field.is_submitted = false
+}
+
+handle_input_events :: proc "contextless" (input_handle: win.HANDLE, p_input_field: ^Input_field_t) {
+    num_events: win.DWORD = 0
+    if( !local_win.GetNumberOfConsoleInputEvents(input_handle, &num_events)){
+        // TODO[Jeppe]: Logging
+        return 
+    }
+    events_read: u32 = 0
+    input_records: [64]local_win.INPUT_RECORD
+    if(!local_win.ReadConsoleInputW(input_handle, &input_records[0], num_events, &events_read)){
+        // TODO[Jeppe]: Logging
+        return
+    }
+
+    for input_record in input_records {
+        switch(input_record.EventType){
+            case local_win.KEY_EVENT:
+                key_event := input_record.Event.KeyEvent
+                if key_event.bKeyDown {
+                    switch key_event.wVirtualKeyCode {
+                        case 0x08: // BACKSPACE
+                            p_input_field.value        = 0
+                            p_input_field.is_submitted = false
+                        case 0x0D: // ENTER
+                                p_input_field.is_submitted = true
+                        case 0x31: // 1
+                            p_input_field.value        = 1
+                            p_input_field.is_submitted = false
+                        case 0x32: // 2
+                            p_input_field.value        = 2
+                            p_input_field.is_submitted = false
+                        case 0x33: // 3
+                            p_input_field.value        = 3
+                            p_input_field.is_submitted = false
+                        case 0x34: // 4
+                            p_input_field.value        = 4
+                            p_input_field.is_submitted = false
+                        case 0x35: // 5
+                            p_input_field.value        = 5
+                            p_input_field.is_submitted = false
+                    }
+                }
+        }
+    }
+}
+
+play_round :: proc "contextless" (player_1_hand: Hand_e, player_2_hand: Hand_e) -> Round_State_e {
     outcome := [3][3]Round_State_e{
 	    {.Draw, .Player_2_Win, .Player_1_Win},
 		{.Player_1_Win, .Draw, .Player_2_Win},
@@ -136,53 +186,7 @@ main :: proc() {
     // Game loop
     is_app_running := true
     for is_app_running {
-
-        // Input processing
-        {
-            num_events: win.DWORD = 0
-            if( !local_win.GetNumberOfConsoleInputEvents(input_handle, &num_events)){
-                // TODO[Jeppe]: Logging
-                return 
-            }
-            events_read: u32 = 0
-            input_records: [64]local_win.INPUT_RECORD
-            if(!local_win.ReadConsoleInputW(input_handle, &input_records[0], num_events, &events_read)){
-                // TODO[Jeppe]: Logging
-                return
-            }
-
-            for input_record in input_records {
-                switch(input_record.EventType){
-                    case local_win.KEY_EVENT:
-                        key_event := input_record.Event.KeyEvent
-                        if key_event.bKeyDown {
-                            p_input_field := &game_state.input_field
-                            switch key_event.wVirtualKeyCode {
-                                case 0x08: // BACKSPACE
-                                    p_input_field.value        = 0
-                                    p_input_field.is_submitted = false
-                                case 0x0D: // ENTER
-                                        p_input_field.is_submitted = true
-                                case 0x31: // 1
-                                    p_input_field.value        = 1
-                                    p_input_field.is_submitted = false
-                                case 0x32: // 2
-                                    p_input_field.value        = 2
-                                    p_input_field.is_submitted = false
-                                case 0x33: // 3
-                                    p_input_field.value        = 3
-                                    p_input_field.is_submitted = false
-                                case 0x34: // 4
-                                    p_input_field.value        = 4
-                                    p_input_field.is_submitted = false
-                                case 0x35: // 5
-                                    p_input_field.value        = 5
-                                    p_input_field.is_submitted = false
-                            }
-                        }
-                }
-            }
-        }
+        handle_input_events(input_handle, &game_state.input_field)
 
         #partial switch game_state.game_mode {
 
@@ -206,8 +210,7 @@ main :: proc() {
                             game_state.game_mode = .Multiplayer
                         case 5: is_app_running = false
                     }
-                    p_input_field.value        = 0
-                    p_input_field.is_submitted = false
+                    reset_input_field(p_input_field)
                 }
 
 
@@ -222,8 +225,7 @@ main :: proc() {
                             case 3: game_state.player_1_hand = .Scissor
                             case 4: is_app_running = false
                         }
-                        p_input_field.value = 0
-                        p_input_field.is_submitted = false
+                        reset_input_field(p_input_field)
                         game_state.is_drawn = false
                     }
                 } else {
@@ -235,8 +237,7 @@ main :: proc() {
                     p_input_field := &game_state.input_field
                     if p_input_field.is_submitted {
                         game_state.game_mode = .None
-                        p_input_field.value = 0
-                        p_input_field.is_submitted = false
+                        reset_input_field(p_input_field)
                         game_state.is_drawn = false
                         game_state.player_1_hand = .None
                         game_state.player_2_hand = .None
@@ -254,8 +255,7 @@ main :: proc() {
                             case 3: game_state.player_1_hand = .Scissor
                             case 4: is_app_running = false
                         }
-                        p_input_field.value = 0
-                        p_input_field.is_submitted = false
+                        reset_input_field(p_input_field)
                         game_state.is_drawn = false
                     }
                 } else {
@@ -269,8 +269,7 @@ main :: proc() {
                             case .Player_2_Win: p_best_of_state.ai_wins += 1
                             case .Draw:     
                         }
-                        p_input_field.value = 0
-                        p_input_field.is_submitted = false
+                        reset_input_field(p_input_field)
                         game_state.is_drawn = false
                     } 
                     
@@ -278,8 +277,7 @@ main :: proc() {
                         render_best_of_game(&game_state)
                         p_input_field := &game_state.input_field
                         if p_input_field.is_submitted {
-                            p_input_field.value = 0
-                            p_input_field.is_submitted = false
+                            reset_input_field(p_input_field)
                             game_state.is_drawn = false
                             game_state.player_1_hand = .None
                             game_state.player_2_hand = .None
@@ -307,8 +305,7 @@ main :: proc() {
                                 case 3: game_state.player_1_hand = .Scissor
                                 case 4: is_app_running = false
                             }
-                                p_input_field.value = 0
-                                p_input_field.is_submitted = false
+                                reset_input_field(p_input_field)
                                 game_state.is_drawn = false
                         }
                     } else {
@@ -321,8 +318,7 @@ main :: proc() {
                                 case .Player_2_Win: p_speed_state.score -= 1
                                 case .Draw:     
                             }
-                            p_input_field.value = 0
-                            p_input_field.is_submitted = false
+                            reset_input_field(p_input_field)
                             game_state.is_drawn = false
                         } 
                     
@@ -330,8 +326,7 @@ main :: proc() {
                             render_speed_game(&game_state)
                             p_input_field := &game_state.input_field
                             if p_input_field.is_submitted {
-                                p_input_field.value = 0
-                                p_input_field.is_submitted = false
+                                reset_input_field(p_input_field)
                                 game_state.is_drawn = false
                                 game_state.player_1_hand = .None
                                 game_state.player_2_hand = .None
@@ -348,8 +343,7 @@ main :: proc() {
                     render_speed_end(&game_state)
                     p_input_field := &game_state.input_field
                     if p_input_field.is_submitted {
-                        p_input_field.value = 0
-                        p_input_field.is_submitted = false
+                        reset_input_field(p_input_field)
                         game_state.is_drawn = false
                         game_state.player_1_hand = .None
                         game_state.player_2_hand = .None
@@ -367,8 +361,7 @@ main :: proc() {
                                 case 3: game_state.player_1_hand = .Scissor
                                 case 4: is_app_running = false
                             }
-                            p_input_field.value = 0
-                            p_input_field.is_submitted = false
+                            reset_input_field(p_input_field)
                             game_state.is_drawn = false
                         }
                 }
@@ -383,10 +376,8 @@ main :: proc() {
                             case 3: game_state.player_2_hand = .Scissor
                             case 4: is_app_running = false
                         }
-                        p_input_field.value = 0
-                        p_input_field.is_submitted = false
+                        reset_input_field(p_input_field)
                         game_state.is_drawn = false
-
                         game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
                     }
                 }
@@ -396,8 +387,7 @@ main :: proc() {
                     p_input_field := &game_state.input_field
                     if p_input_field.is_submitted {
                         game_state.game_mode = .None
-                        p_input_field.value = 0
-                        p_input_field.is_submitted = false
+                        reset_input_field(p_input_field)
                         game_state.is_drawn = false
                         game_state.player_1_hand = .None
                         game_state.player_2_hand = .None
