@@ -71,6 +71,22 @@ select_hand :: proc "contextless" (p_input_field: ^Input_field_t) -> Hand_e {
     return result
 }
 
+
+select_hand_option :: proc "contextless" (p_input_field: ^Input_field_t) -> (bool, Hand_e) {
+    is_submitted := false
+    hand: Hand_e = .None
+    if p_input_field.is_submitted && p_input_field.value < 5 {
+        switch p_input_field.value {
+            case 1: hand = .Rock
+            case 2: hand = .Paper
+            case 3: hand = .Scissor
+        }
+        is_submitted = true
+        reset_input_field(p_input_field)
+    }
+    return is_submitted, hand;
+}
+
 reset_input_field :: proc "contextless" (p_input_field: ^Input_field_t) {
     p_input_field.value        = 0
     p_input_field.is_submitted = false
@@ -229,11 +245,10 @@ main :: proc() {
             case .Classic: // Classic game mode
                 if game_state.player_1_hand == .None {
                     render_classic_selection(&game_state)
-                    p_input_field := &game_state.input_field
-                    if p_input_field.is_submitted && p_input_field.value < 5 {
-                        hand := select_hand(p_input_field)
-                        if( hand != .None) {
-                            game_state.player_1_hand = hand
+                    is_submitted, hand_opt := select_hand_option(&game_state.input_field)
+                    if is_submitted {
+                        if hand_opt != .None {
+                            game_state.player_1_hand = hand_opt
                         } else {
                             game_state.game_mode = .None
                         }
@@ -258,11 +273,10 @@ main :: proc() {
             case .Best_Of:
                 if game_state.player_1_hand == .None {
                     render_best_of_selection(&game_state)
-                    p_input_field := &game_state.input_field
-                    if p_input_field.is_submitted && p_input_field.value < 5 {
-                        hand := select_hand(p_input_field)
-                        if( hand != .None) {
-                            game_state.player_1_hand = hand
+                    is_submitted, hand_opt := select_hand_option(&game_state.input_field)
+                    if is_submitted {
+                        if hand_opt != .None {
+                            game_state.player_1_hand = hand_opt
                         } else {
                             game_state.game_mode = .None
                         }
@@ -304,18 +318,17 @@ main :: proc() {
                 p_speed_state := &game_state.game_mode_state.(Speed_Mode_State_t)
                 duration := time.stopwatch_duration(p_speed_state.stopwatch)
                 seconds  := time.duration_seconds(duration)
-                if seconds <= 30.0 { // TODO[Jeppe]: Remember to change this
+                if seconds <= 30.0 {
                     if game_state.player_1_hand == .None {
                         render_speed_selection(&game_state)
-                        p_input_field := &game_state.input_field
-                        if p_input_field.is_submitted && p_input_field.value < 5 {
-                                hand := select_hand(p_input_field)
-                                if( hand != .None) {
-                                    game_state.player_1_hand = hand
-                                } else {
-                                    game_state.game_mode = .None
-                                }
-                                game_state.is_drawn = false
+                        is_submitted, hand_opt := select_hand_option(&game_state.input_field)
+                        if is_submitted {
+                            if hand_opt != .None {
+                                game_state.player_1_hand = hand_opt
+                            } else {
+                                game_state.game_mode = .None
+                            }
+                            game_state.is_drawn = false
                         }
                     } else {
                         if game_state.player_2_hand == .None {
@@ -362,11 +375,10 @@ main :: proc() {
             case .Multiplayer:
                 if game_state.player_1_hand == .None {
                         render_multiplayer_selection_player(&game_state, true)
-                        p_input_field := &game_state.input_field
-                        if p_input_field.is_submitted && p_input_field.value < 5 {
-                            hand := select_hand(p_input_field)
-                            if( hand != .None) {
-                                game_state.player_1_hand = hand
+                        is_submitted, hand_opt := select_hand_option(&game_state.input_field)
+                        if is_submitted {
+                            if hand_opt != .None {
+                                game_state.player_1_hand = hand_opt
                             } else {
                                 game_state.game_mode = .None
                             }
@@ -376,16 +388,15 @@ main :: proc() {
 
                 if game_state.player_2_hand == .None {
                     render_multiplayer_selection_player(&game_state, false)
-                    p_input_field := &game_state.input_field
-                    if p_input_field.is_submitted && p_input_field.value < 5 {
-                        hand := select_hand(p_input_field)
-                        if( hand != .None) {
-                            game_state.player_2_hand = hand
+                    is_submitted, hand_opt := select_hand_option(&game_state.input_field)
+                    if is_submitted {
+                        if hand_opt != .None {
+                            game_state.player_2_hand = hand_opt
                         } else {
                             game_state.game_mode = .None
                         }
-                        game_state.is_drawn = false
                         game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                        game_state.is_drawn = false
                     }
                 }
 
