@@ -78,19 +78,6 @@ get_random_hand :: proc() -> Hand_e {
     return Hand_e(random_hand_idx)
 }
 
-// TODO[Jeppe]: Need to fetch player hands.
-play_multiplayer :: proc() {
-    ai_hand     := get_random_hand()
-    round_state := play_round(.Rock, ai_hand)
-    switch round_state {
-        case .Player_1_Win: fmt.println("Player 1 wins!")
-        case .Player_2_Win: fmt.println("Player 2 wins!")
-        case .Draw:         fmt.println("It's a draw!")
-    }
-}
-
-
-
 main :: proc() {
     output_handle := win.GetStdHandle( win.STD_OUTPUT_HANDLE )
 	if( output_handle == win.INVALID_HANDLE_VALUE ) {
