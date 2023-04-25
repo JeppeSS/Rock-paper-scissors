@@ -1,1 +1,1 @@
-odin build .\src -collection:windows=src\windows 
+odin build .\src -debug -collection:windows=src\windows 

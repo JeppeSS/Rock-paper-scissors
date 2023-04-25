@@ -8,6 +8,51 @@ import win "core:sys/windows"
 import local_win "windows"
 
 
+Prediction_model :: struct {
+    transitions: [3][3][3]u16,
+}
+
+
+prediction_model_init :: proc "contextless" (p_model: ^Prediction_model) {
+    for i := 0; i < 3; i += 1 {
+        for j := 0; j < 3; j += 1 {
+            for k := 0; k < 3; k += 1 {
+                p_model.transitions[i][j][k] = 0
+            }
+        }
+    }
+}
+
+prediction_model_update :: proc "contextless" (p_model: ^Prediction_model, prev_prev_choice: Hand_e, prev_choice: Hand_e, current_choice: Hand_e) {
+    if prev_prev_choice != .None && prev_choice != .None {
+        p_model.transitions[prev_prev_choice][prev_choice][current_choice] += 1    
+    }
+}
+
+prediction_model_predict :: proc(p_model: ^Prediction_model, prev_prev_choice: Hand_e, prev_choice: Hand_e) -> Hand_e {
+    total_count: u16 = 0
+    counts := [3]u16{0, 0, 0}
+    if prev_prev_choice != .None && prev_choice != .None {
+        for i := 0; i < 3; i += 1 {
+            counts[i] = p_model.transitions[prev_prev_choice][prev_choice][i]
+            total_count += counts[i]
+        }    
+    }
+
+    if total_count != 0 {
+        rand_num := cast(u16)rand.uint32() % total_count
+        cum_count: u16 = 0
+        for i := 0; i < 3; i += 1 {
+            cum_count += counts[i]
+            if rand_num < cum_count {
+                return Hand_e(i)
+            }
+        }
+    }
+    return get_random_hand()
+}
+
+
 Game_Mode_e :: enum u8 {
     Classic,
     Best_Of,
@@ -50,13 +95,20 @@ Game_State_t :: struct {
     game_mode_state: union {
         Best_Of_Mode_State_t,
         Speed_Mode_State_t,
-    }
+    },
 
+    
     player_1_hand: Hand_e,
     player_2_hand: Hand_e,
     round_state:   Round_State_e,
     input_field:   Input_field_t,
     is_drawn:      bool,
+
+    // Prediction model parameters
+    prediction_model:        Prediction_model,
+    prev_player_choice:      Hand_e,
+    prev_prev_player_choice: Hand_e,
+
 
 }
 
@@ -225,14 +277,20 @@ main :: proc() {
     // Clear
     fmt.printf("\x1b[2J")
 
+    prediction_model := Prediction_model{}
+    prediction_model_init(&prediction_model)
+
     game_state := Game_State_t{
-        game_mode       = .None,
-        game_mode_state = nil,
-        input_field     = Input_field_t{ value = 0, is_submitted = false }
-        player_1_hand   = .None,
-        player_2_hand   = .None,
-        round_state     = nil,
-        is_drawn        = false,
+        game_mode               = .None,
+        game_mode_state         = nil,
+        input_field             = Input_field_t{ value = 0, is_submitted = false },
+        player_1_hand           = .None,
+        player_2_hand           = .None,
+        round_state             = nil,
+        is_drawn                = false,
+        prediction_model        = prediction_model,
+        prev_prev_player_choice = .None,
+        prev_player_choice      = .None,
 
     }
 
@@ -278,8 +336,11 @@ main :: proc() {
                     handle_player_1_selection(&game_state)
                 } else {
                     if game_state.player_2_hand == .None {
-                        game_state.player_2_hand = get_random_hand()
+                        game_state.player_2_hand = prediction_model_predict(&game_state.prediction_model, game_state.prev_prev_player_choice, game_state.prev_player_choice)
                         game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                        prediction_model_update(&game_state.prediction_model,  game_state.prev_prev_player_choice, game_state.prev_player_choice, game_state.player_2_hand)
+                        game_state.prev_prev_player_choice = game_state.prev_player_choice
+                        game_state.prev_player_choice = game_state.player_1_hand
                     }
                     render_classic_game(&game_state)
                     if game_state.input_field.is_submitted {
@@ -294,14 +355,16 @@ main :: proc() {
                 } else {
                     p_best_of_state := &game_state.game_mode_state.(Best_Of_Mode_State_t)
                     if game_state.player_2_hand == .None {
-                        game_state.player_2_hand = get_random_hand()
+                        game_state.player_2_hand = prediction_model_predict(&game_state.prediction_model, game_state.prev_prev_player_choice, game_state.prev_player_choice)
                         game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                        prediction_model_update(&game_state.prediction_model,  game_state.prev_prev_player_choice, game_state.prev_player_choice, game_state.player_2_hand)
+                        game_state.prev_prev_player_choice = game_state.prev_player_choice
+                        game_state.prev_player_choice = game_state.player_1_hand
                         switch game_state.round_state {
                             case .Player_1_Win: p_best_of_state.player_wins += 1
                             case .Player_2_Win: p_best_of_state.ai_wins += 1
                             case .Draw:     
                         }
-                        reset_input_field(&game_state.input_field)
                         game_state.is_drawn = false
                     } 
                     
@@ -328,8 +391,11 @@ main :: proc() {
                         handle_player_1_selection(&game_state)
                     } else {
                         if game_state.player_2_hand == .None {
-                            game_state.player_2_hand = get_random_hand()
+                            game_state.player_2_hand = prediction_model_predict(&game_state.prediction_model, game_state.prev_prev_player_choice, game_state.prev_player_choice)
                             game_state.round_state = play_round(game_state.player_1_hand, game_state.player_2_hand)
+                            prediction_model_update(&game_state.prediction_model,  game_state.prev_prev_player_choice, game_state.prev_player_choice, game_state.player_2_hand)
+                            game_state.prev_prev_player_choice = game_state.prev_player_choice
+                            game_state.prev_player_choice = game_state.player_1_hand
                             switch game_state.round_state {
                                 case .Player_1_Win: p_speed_state.score += 1
                                 case .Player_2_Win: p_speed_state.score -= 1
